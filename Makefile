@@ -41,6 +41,9 @@ tcp_stream-objs := tcp_stream_main.o tcp_stream.o $(lib)
 
 ext-libs := -lm -lpthread -lrt
 
+staging-dir := $(shell pwd)/staging
+luajit-dir := vendor/luajit.org/luajit-2.1
+
 tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ext-libs)
 
@@ -49,5 +52,13 @@ tcp_stream: $(tcp_stream-objs)
 
 binaries: tcp_rr tcp_stream
 
-clean:
+clean: clean-luajit
 	rm -f *.o tcp_rr tcp_stream
+	rm -rf $(staging-dir)
+
+luajit:
+	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
+	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
+
+clean-luajit:
+	$(MAKE) -C $(luajit-dir) clean
