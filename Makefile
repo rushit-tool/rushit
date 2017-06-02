@@ -20,6 +20,11 @@ all: binaries
 
 CFLAGS = -std=c99 -Wall -Werror -O3 -g -D_GNU_SOURCE
 
+staging-dir := staging
+
+luajit-dir := vendor/luajit.org/luajit-2.1
+luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
+
 lib := \
 	common.o \
 	control_plane.o \
@@ -40,15 +45,13 @@ tcp_rr-objs := tcp_rr_main.o tcp_rr.o $(lib)
 tcp_stream-objs := tcp_stream_main.o tcp_stream.o $(lib)
 
 ext-libs := -lm -lpthread -lrt
+lua-libs := $(luajit-lib)
 
-staging-dir := $(shell pwd)/staging
-luajit-dir := vendor/luajit.org/luajit-2.1
-
-tcp_rr: $(tcp_rr-objs)
+tcp_rr: $(tcp_rr-objs) $(lua-libs)
 	$(CC) -o $@ $^ $(ext-libs)
 
-tcp_stream: $(tcp_stream-objs)
-	$(CC) -o $@ $^ $(ext-libs)
+tcp_stream: $(tcp_stream-objs) $(lua-libs)
+	$(CC) -o $@ $^ $(ext-libs) $(lua-libs)
 
 binaries: tcp_rr tcp_stream
 
@@ -56,9 +59,9 @@ clean: clean-luajit
 	rm -f *.o tcp_rr tcp_stream
 	rm -rf $(staging-dir)
 
-luajit:
-	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
-	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
+$(luajit-lib):
+	$(MAKE) -C $(luajit-dir) PREFIX=$(abspath $(staging-dir))
+	$(MAKE) -C $(luajit-dir) PREFIX=$(abspath $(staging-dir)) install
 
 clean-luajit:
 	$(MAKE) -C $(luajit-dir) clean
