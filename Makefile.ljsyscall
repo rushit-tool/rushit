@@ -1,0 +1,37 @@
+#
+# Bundle ljsyscall bytecode as a static library
+#
+
+# TODO: Pass $(luajit) from top-level Makefile
+luajit := staging/bin/luajit-2.1.0-beta3
+
+# TODO: Pass base $(lib-dir) and $(obj-base) from top-level Makefile
+lib-dir := lib
+obj-dir := obj/ljsyscall
+src-dir := vendor/github.com/justincormack/ljsyscall
+
+lib := $(lib-dir)/ljsyscall.a
+
+srcs := $(wildcard \
+		$(src-dir)/syscall.lua \
+		$(src-dir)/syscall/*.lua \
+		$(src-dir)/syscall/linux/*.lua)
+#$(info srcs are $(srcs))
+
+objs := $(srcs:%.lua=%.o)
+objs := $(subst $(src-dir),$(obj-dir),$(objs))
+#$(info objs are $(objs))
+
+$(obj-dir)/%.o: $(src-dir)/%.lua
+	mkdir -p $(dir $@)
+	$(luajit) -b $< $@
+
+$(lib): $(objs)
+	mkdir -p $(dir $@)
+	$(AR) cr $@ $^
+
+.PHONY: all
+all: $(lib)
+
+clean:
+	$(RM) -r $(lib) $(obj-dir)
