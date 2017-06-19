@@ -17,6 +17,9 @@
 #ifndef NEPER_LOGGING_H
 #define NEPER_LOGGING_H
 
+#include <errno.h>
+#include <string.h>
+
 struct callbacks;
 
 void logging_init(struct callbacks *);
