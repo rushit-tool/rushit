@@ -21,7 +21,13 @@
 #include "logging.h"
 #include "numlist.h"
 
-void epoll_add_or_die(int epollfd, int fd, uint32_t events, struct callbacks *cb)
+/**
+ * Creates a lite flow that wraps a file descriptor to monitor for events.
+ *
+ * Caller releases the flow using free().
+ */
+struct flow *addflow_lite(int epfd, int fd, uint32_t events,
+                          struct callbacks *cb)
 {
         struct epoll_event ev;
         struct flow *flow;
@@ -30,7 +36,9 @@ void epoll_add_or_die(int epollfd, int fd, uint32_t events, struct callbacks *cb
         flow->fd = fd;
         ev.events = events;
         ev.data.ptr = flow;
-        epoll_ctl_or_die(epollfd, EPOLL_CTL_ADD, fd, &ev, cb);
+        epoll_ctl_or_die(epfd, EPOLL_CTL_ADD, fd, &ev, cb);
+
+        return flow;
 }
 
 #ifndef SO_MAX_PACING_RATE

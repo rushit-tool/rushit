@@ -196,6 +196,7 @@ static void run_client(struct thread *t)
                                                          t->index);
         struct callbacks *cb = t->cb;
         struct epoll_event *events;
+        struct flow *stop_fl;
         int epfd, i;
         char *buf;
 
@@ -203,7 +204,7 @@ static void run_client(struct thread *t)
         epfd = epoll_create1(0);
         if (epfd == -1)
                 PLOG_FATAL(cb, "epoll_create1");
-        epoll_add_or_die(epfd, t->stop_efd, EPOLLIN, cb);
+        stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         for (i = 0; i < flows_in_this_thread; i++)
                 client_connect(i, epfd, t);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
@@ -221,6 +222,7 @@ static void run_client(struct thread *t)
         }
         free(buf);
         free(events);
+        free(stop_fl);
         do_close(epfd);
 }
 
@@ -312,6 +314,8 @@ static void run_server(struct thread *t)
         struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
         struct epoll_event *events;
+        struct flow *listen_fl;
+        struct flow *stop_fl;
         int fd_listen, epfd;
         char *buf;
 
@@ -329,8 +333,8 @@ static void run_server(struct thread *t)
         epfd = epoll_create1(0);
         if (epfd == -1)
                 PLOG_FATAL(cb, "epoll_create1");
-        epoll_add_or_die(epfd, t->stop_efd, EPOLLIN, cb);
-        epoll_add_or_die(epfd, fd_listen, EPOLLIN, cb);
+        listen_fl = addflow_lite(epfd, fd_listen, EPOLLIN, cb);
+        stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
         buf = buf_alloc(opts);
         pthread_barrier_wait(t->ready);
@@ -346,6 +350,8 @@ static void run_server(struct thread *t)
         }
         free(buf);
         free(events);
+        free(stop_fl);
+        free(listen_fl);
         do_close(epfd);
         do_close(fd_listen);
 }

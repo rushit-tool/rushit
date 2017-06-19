@@ -37,7 +37,8 @@ struct flow {
         struct interval *itv;
 };
 
-void epoll_add_or_die(int epollfd, int fd, uint32_t, struct callbacks *cb);
+struct flow *addflow_lite(int epfd, int fd, uint32_t events,
+                          struct callbacks *cb);
 struct flow *addflow(int tid, int epfd, int fd, int flow_id, uint32_t events,
                      struct options *opts, struct callbacks *cb);
 void delflow(int tid, int epfd, struct flow *flow, struct callbacks *cb);
