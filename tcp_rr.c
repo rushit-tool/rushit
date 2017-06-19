@@ -347,6 +347,7 @@ static void run_server(struct thread *t)
         free(buf);
         free(events);
         do_close(epfd);
+        do_close(fd_listen);
 }
 
 static void *thread_start(void *arg)
