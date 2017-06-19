@@ -52,6 +52,11 @@ static const struct rate_conversion conversions[] = {
         { NULL,  0 }
 };
 
+static inline const char *strnull(const char *s)
+{
+        return s ? s : "(null)";
+}
+
 struct addrinfo *do_getaddrinfo(const char *host, const char *port, int flags,
                                 const struct options *opts,
                                 struct callbacks *cb)
@@ -72,8 +77,11 @@ struct addrinfo *do_getaddrinfo(const char *host, const char *port, int flags,
         LOG_INFO(cb, "before getaddrinfo");
         int s = getaddrinfo(host, port, &hints, &result);
         LOG_INFO(cb, "after getaddrinfo");
-        if (s)
-                LOG_FATAL(cb, "getaddrinfo: %s", gai_strerror(s));
+        if (s) {
+                LOG_FATAL(cb, "getaddrinfo(%s, %s): %s",
+                          strnull(host), strnull(port),
+                          gai_strerror(s));
+	}
 
         return result;
 }
