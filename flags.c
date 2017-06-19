@@ -55,14 +55,17 @@ static void flag_destroy(struct flag *flag)
         free(flag->usage);
         free(flag->type);
         free(flag->variable_name);
+        free(flag);
 }
 
 void flags_parser_destroy(struct flags_parser *fp)
 {
-        struct flag *flag;
+        struct flag *flag, *next;
 
-        for (flag = fp->flags; flag; flag = flag->next)
+        for (flag = fp->flags; flag; flag = next) {
+                next = flag->next;
                 flag_destroy(flag);
+        }
         free(fp);
 }
 
