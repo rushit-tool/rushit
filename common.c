@@ -74,6 +74,14 @@ struct addrinfo *do_getaddrinfo(const char *host, const char *port, int flags,
         hints.ai_flags = flags;
         hints.ai_protocol = 0;            /* Any protocol */
 
+        /* Exception: When asking for an address for a listening socket but the
+         * family has not been specified, go with IPv6. Otherwise, on Linux,
+         * getaddrinfo() will give us an IPv4 address first and we won't be
+         * listening for IPv6 connections. iperf3 & netperf do the same.
+         */
+        if (hints.ai_family == AF_UNSPEC && (hints.ai_flags & AI_PASSIVE))
+                hints.ai_family = AF_INET6;
+
         LOG_INFO(cb, "before getaddrinfo");
         int s = getaddrinfo(host, port, &hints, &result);
         LOG_INFO(cb, "after getaddrinfo");
