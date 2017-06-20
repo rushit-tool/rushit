@@ -59,6 +59,9 @@ clean: clean-luajit
 	rm -f *.o tcp_rr tcp_stream
 	rm -rf $(staging-dir)
 
+.PHONY: luajit
+luajit: $(luajit-lib)
+
 $(luajit-lib):
 	$(MAKE) -C $(luajit-dir) PREFIX=$(abspath $(staging-dir))
 	$(MAKE) -C $(luajit-dir) PREFIX=$(abspath $(staging-dir)) install
