@@ -44,6 +44,7 @@ all-libs := $(base-lib) $(luajit-lib)
 
 tcp_rr-objs := tcp_rr_main.o tcp_rr.o $(all-libs)
 tcp_stream-objs := tcp_stream_main.o tcp_stream.o $(all-libs)
+dummy_test-objs := dummy_test_main.o dummy_test.o $(all-libs)
 
 ext-libs := -lm -lpthread -lrt
 
@@ -53,7 +54,10 @@ tcp_rr: $(tcp_rr-objs)
 tcp_stream: $(tcp_stream-objs)
 	$(CC) -o $@ $^ $(ext-libs)
 
-binaries: tcp_rr tcp_stream
+dummy_test: $(dummy_test-objs)
+	$(CC) -o $@ $^ $(ext-libs)
+
+binaries: tcp_rr tcp_stream dummy_test
 
 clean: clean-luajit
 	rm -f *.o tcp_rr tcp_stream
