@@ -25,7 +25,7 @@ staging-dir := staging
 luajit-dir := vendor/luajit.org/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
 
-lib := \
+base-lib := \
 	common.o \
 	control_plane.o \
 	cpuinfo.o \
@@ -40,18 +40,18 @@ lib := \
 	thread.o \
 	version.o
 
-tcp_rr-objs := tcp_rr_main.o tcp_rr.o $(lib)
+all-libs := $(base-lib) $(luajit-lib)
 
-tcp_stream-objs := tcp_stream_main.o tcp_stream.o $(lib)
+tcp_rr-objs := tcp_rr_main.o tcp_rr.o $(all-libs)
+tcp_stream-objs := tcp_stream_main.o tcp_stream.o $(all-libs)
 
 ext-libs := -lm -lpthread -lrt
-lua-libs := $(luajit-lib)
 
-tcp_rr: $(tcp_rr-objs) $(lua-libs)
+tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ext-libs)
 
-tcp_stream: $(tcp_stream-objs) $(lua-libs)
-	$(CC) -o $@ $^ $(ext-libs) $(lua-libs)
+tcp_stream: $(tcp_stream-objs)
+	$(CC) -o $@ $^ $(ext-libs)
 
 binaries: tcp_rr tcp_stream
 
