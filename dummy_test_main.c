@@ -15,6 +15,7 @@
  */
 
 #include <stdlib.h>
+#include "common.h"
 #include "flags.h"
 #include "lib.h"
 #include "logging.h"
