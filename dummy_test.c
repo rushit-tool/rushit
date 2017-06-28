@@ -54,21 +54,33 @@ static void client_events(struct thread *t, int epfd,
         }
 }
 
+static void client_connect(int i, int epfd, struct thread *t)
+{
+        /* STUB: Create socket */
+        /* STUB: Set socket options */
+        /* STUB: Connect socket */
+        /* STUB: Add flow */
+}
+
 static void run_client(struct thread *t)
 {
         struct options *opts = t->opts;
+        const int flows_in_this_thread = flows_in_thread(opts->num_flows,
+                                                         opts->num_threads,
+                                                         t->index);
         struct callbacks *cb = t->cb;
         struct epoll_event *events;
         struct flow *stop_fl;
         char *buf = NULL;
-        int epfd;
+        int epfd, i;
 
         /* Setup I/O multiplexer */
         epfd = epoll_create1(0);
         if (epfd == -1)
                 PLOG_FATAL(cb, "epoll_create1");
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
-        /* STUB: For each flow connect to server */
+        for (i = 0; i < flows_in_this_thread; i++)
+                client_connect(i, epfd, t);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
 
         /* STUB: Allocate buffers */
