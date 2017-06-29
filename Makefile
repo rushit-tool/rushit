@@ -16,8 +16,20 @@
 #
 # Makefile.
 
+# Madatory flags (required for proper compilation)
+OUR_CPPFLAGS := -D_GNU_SOURCE
+OUR_CFLAGS   :=
+OUR_LDFLAGS  :=
 
-CFLAGS = -std=c99 -Wall -Werror -O3 -g -D_GNU_SOURCE
+# Recommended flags (may be overridden by the user)
+CPPFLAGS :=
+CFLAGS   := -std=c99 -Wall -Werror -O3 -g
+LDFLAGS  :=
+
+# Merged flags
+ALL_CPPFLAGS := $(OUR_CPPFLAGS) $(CPPFLAGS)
+ALL_CFLAGS   := $(OUR_CFLAGS) $(CFLAGS)
+ALL_LDFLAGS  := $(OUR_LDFLAGS) $(LDFLAGS)
 
 staging-dir := staging
 
@@ -49,14 +61,17 @@ binaries := tcp_rr tcp_stream dummy_test
 
 ext-libs := -lm -lpthread -lrt
 
+.c.o:
+	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $<
+
 tcp_rr: $(tcp_rr-objs)
-	$(CC) -o $@ $^ $(ext-libs)
+	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
 
 tcp_stream: $(tcp_stream-objs)
-	$(CC) -o $@ $^ $(ext-libs)
+	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
 
 dummy_test: $(dummy_test-objs)
-	$(CC) -o $@ $^ $(ext-libs)
+	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
 
 all: $(binaries)
 
