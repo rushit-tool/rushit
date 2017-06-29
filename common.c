@@ -89,7 +89,7 @@ struct addrinfo *do_getaddrinfo(const char *host, const char *port, int flags,
                 LOG_FATAL(cb, "getaddrinfo(%s, %s): %s",
                           strnull(host), strnull(port),
                           gai_strerror(s));
-	}
+        }
 
         return result;
 }
@@ -184,7 +184,7 @@ int procfile_int(const char *path, struct callbacks *cb)
         if (!f)
                 PLOG_FATAL(cb, "fopen '%s'", path);
         if (fscanf(f, "%d", &result) != 1)
-		PLOG_FATAL(cb, "fscanf");
+                PLOG_FATAL(cb, "fscanf");
         fclose(f);
         return result;
 }

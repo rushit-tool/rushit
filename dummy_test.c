@@ -113,103 +113,103 @@ static void run_client(struct thread *t)
 }
 
 static void server_events(struct thread *t, int epfd,
-			  struct epoll_event *events, int nfds, int fd_listen,
-			  char *buf)
+                          struct epoll_event *events, int nfds, int fd_listen,
+                          char *buf)
 {
-	int i;
+        int i;
 
-	for (i = 0; i < nfds; i++) {
-		struct flow *flow = events[i].data.ptr;
-		if (flow->fd == t->stop_efd) {
-			t->stop = 1;
-			break;
-		}
-		/* STUB: Accept incoming data connections */
-		/* STUB: Delete flow on EPOLLRDHUP */
-		/* STUB: Read on EPOLLIN */
+        for (i = 0; i < nfds; i++) {
+                struct flow *flow = events[i].data.ptr;
+                if (flow->fd == t->stop_efd) {
+                        t->stop = 1;
+                        break;
+                }
+                /* STUB: Accept incoming data connections */
+                /* STUB: Delete flow on EPOLLRDHUP */
+                /* STUB: Read on EPOLLIN */
                 /* LUA: Run server_read hook */
-		/* STUB: Write on EPOLLOUT */
+                /* STUB: Write on EPOLLOUT */
                 /* LUA: Run server_write hook */
                 /* STUB: Read errors on EPOLLPRI? */
                 /* LUA: Run server_error hook */
-	}
+        }
 }
 
 static void run_server(struct thread *t)
 {
-	struct options *opts = t->opts;
+        struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
-	struct epoll_event *events;
+        struct epoll_event *events;
         struct flow *stop_fl;
-	int fd_listen = -1, epfd;
-	char *buf = NULL;
+        int fd_listen = -1, epfd;
+        char *buf = NULL;
 
         assert(opts->maxevents > 0);
 
-	/* STUB: Create data plane listening socket */
+        /* STUB: Create data plane listening socket */
         /* LUA: Run server_init */
-	/* STUB: Set socket options */
-	/* STUB: Bind & listen */
+        /* STUB: Set socket options */
+        /* STUB: Bind & listen */
 
-	/* Setup I/O multiplexer */
-	epfd = epoll_create1(0);
-	if (epfd == -1)
-		PLOG_FATAL(cb, "epoll_create1");
-	stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
-	events = calloc(opts->maxevents, sizeof(struct epoll_event));
+        /* Setup I/O multiplexer */
+        epfd = epoll_create1(0);
+        if (epfd == -1)
+                PLOG_FATAL(cb, "epoll_create1");
+        stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
+        events = calloc(opts->maxevents, sizeof(struct epoll_event));
 
-	/* STUB: Allocate buffers */
+        /* STUB: Allocate buffers */
 
-	/* Sync threads */
-	pthread_barrier_wait(t->ready);
+        /* Sync threads */
+        pthread_barrier_wait(t->ready);
 
-	/* Main loop */
-	while (!t->stop) {
-		/* Poll for events */
-		int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-		int nfds =  epoll_wait(epfd, events, opts->maxevents, ms);
-		if (nfds == -1) {
-			if (errno == EINTR)
-				continue;
-			PLOG_FATAL(cb, "epoll_wait");
-		}
-		/* Process events */
-		server_events(t, epfd, events, nfds, fd_listen, buf);
-	}
+        /* Main loop */
+        while (!t->stop) {
+                /* Poll for events */
+                int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
+                int nfds =  epoll_wait(epfd, events, opts->maxevents, ms);
+                if (nfds == -1) {
+                        if (errno == EINTR)
+                                continue;
+                        PLOG_FATAL(cb, "epoll_wait");
+                }
+                /* Process events */
+                server_events(t, epfd, events, nfds, fd_listen, buf);
+        }
 
         /* XXX: Sync threads? */
         /* LUA: Run server_exit hooks */
 
-	/* Free resources */
-	/* STUB: Free buffers */
-	free(events);
+        /* Free resources */
+        /* STUB: Free buffers */
+        free(events);
         free(stop_fl);
-	do_close(epfd);
+        do_close(epfd);
 }
 
 static void *worker_thread(void *arg)
 {
-	struct thread *t = arg;
-	struct options *opts = t->opts;
+        struct thread *t = arg;
+        struct options *opts = t->opts;
 
         assert(opts->port);
 
-	reset_port(t->ai, atoi(opts->port), t->cb);
+        reset_port(t->ai, atoi(opts->port), t->cb);
 
-	if (opts->client)
-		run_client(t);
-	else
-		run_server(t);
+        if (opts->client)
+                run_client(t);
+        else
+                run_server(t);
 
-	return NULL;
+        return NULL;
 }
 
 static void report_stats(struct thread *tinfo)
 {
-	(void) tinfo;
+        (void) tinfo;
 }
 
 int dummy_test(struct options *opts, struct callbacks *cb)
 {
-	return run_main_thread(opts, cb, worker_thread, report_stats);
+        return run_main_thread(opts, cb, worker_thread, report_stats);
 }

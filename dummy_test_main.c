@@ -38,18 +38,18 @@ static void check_options(struct options *opts, struct callbacks *cb)
 
 int main(int argc, char **argv)
 {
-	struct options opts = {0};
-	struct callbacks cb = {0};
-	struct flags_parser *fp;
-	int exit_code = 0;
+        struct options opts = {0};
+        struct callbacks cb = {0};
+        struct flags_parser *fp;
+        int exit_code = 0;
 
-	logging_init(&cb);
+        logging_init(&cb);
 
         /* Define only flags that are implicitly required because:
          * (1) they are accessed by common (shared) routines, or
          * (2) the uninitialized value (0/false/NULL) is not acceptable.
          */
-	fp = flags_parser_create(&opts, &cb);
+        fp = flags_parser_create(&opts, &cb);
         DEFINE_FLAG(fp, int,          magic,         42,       0,  "Magic number used by control connections");
         DEFINE_FLAG(fp, int,          maxevents,     1000,     0,  "Number of epoll events per epoll_wait() call");
         DEFINE_FLAG(fp, int,          num_threads,   1,       'T', "Number of threads");
@@ -66,22 +66,22 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, const char *, host,          NULL,    'H', "Server hostname or IP address");
         DEFINE_FLAG(fp, const char *, control_port,  "12866", 'C', "Server control port");
         DEFINE_FLAG(fp, const char *, port,          "12867", 'P', "Server data port");
-	flags_parser_run(fp, argc, argv);
+        flags_parser_run(fp, argc, argv);
 
-	/* Hangle unchecked options */
-	if (opts.logtostderr)
-		cb.logtostderr(cb.logger);
+        /* Hangle unchecked options */
+        if (opts.logtostderr)
+                cb.logtostderr(cb.logger);
 
-	flags_parser_dump(fp);
-	flags_parser_destroy(fp);
-	fp = NULL;
+        flags_parser_dump(fp);
+        flags_parser_destroy(fp);
+        fp = NULL;
 
-	check_options(&opts, &cb);
-	/* STUB: Handle checked options */
+        check_options(&opts, &cb);
+        /* STUB: Handle checked options */
 
-	exit_code = dummy_test(&opts, &cb);
+        exit_code = dummy_test(&opts, &cb);
 
-	logging_exit(&cb);
+        logging_exit(&cb);
 
-	return exit_code;
+        return exit_code;
 }
