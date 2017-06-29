@@ -16,7 +16,6 @@
 #
 # Makefile.
 
-all: binaries
 
 CFLAGS = -std=c99 -Wall -Werror -O3 -g -D_GNU_SOURCE
 
@@ -46,6 +45,8 @@ tcp_rr-objs := tcp_rr_main.o tcp_rr.o $(all-libs)
 tcp_stream-objs := tcp_stream_main.o tcp_stream.o $(all-libs)
 dummy_test-objs := dummy_test_main.o dummy_test.o $(all-libs)
 
+binaries := tcp_rr tcp_stream dummy_test
+
 ext-libs := -lm -lpthread -lrt
 
 tcp_rr: $(tcp_rr-objs)
@@ -57,10 +58,10 @@ tcp_stream: $(tcp_stream-objs)
 dummy_test: $(dummy_test-objs)
 	$(CC) -o $@ $^ $(ext-libs)
 
-binaries: tcp_rr tcp_stream dummy_test
+all: $(binaries)
 
 clean: clean-luajit
-	rm -f *.o tcp_rr tcp_stream
+	rm -f *.o $(binaries)
 	rm -rf $(staging-dir)
 
 .PHONY: luajit
