@@ -50,13 +50,18 @@ static void client_events(struct thread *t, int epfd,
                 }
                 /* STUB: Delete flow on EPOLLRDHUP */
                 /* STUB: Write on EPOLLOUT */
+                /* LUA: Run client_write */
                 /* STUB: Read on EPOLLIN */
+                /* LUA: Run client_read */
+                /* STUB: Read errors on EPOLLPRI */
+                /* LUA: Run client_error */
         }
 }
 
 static void client_connect(int i, int epfd, struct thread *t)
 {
         /* STUB: Create socket */
+        /* LUA: Run client_init hook */
         /* STUB: Set socket options */
         /* STUB: Connect socket */
         /* STUB: Add flow */
@@ -100,6 +105,8 @@ static void run_client(struct thread *t)
                 client_events(t, epfd, events, nfds, buf);
         }
 
+        /* LUA: Run client_exit hook */
+
         free(events);
         free(stop_fl);
         do_close(epfd);
@@ -120,7 +127,11 @@ static void server_events(struct thread *t, int epfd,
 		/* STUB: Accept incoming data connections */
 		/* STUB: Delete flow on EPOLLRDHUP */
 		/* STUB: Read on EPOLLIN */
+                /* LUA: Run server_read hook */
 		/* STUB: Write on EPOLLOUT */
+                /* LUA: Run server_write hook */
+                /* STUB: Read errors on EPOLLPRI? */
+                /* LUA: Run server_error hook */
 	}
 }
 
@@ -136,6 +147,7 @@ static void run_server(struct thread *t)
         assert(opts->maxevents > 0);
 
 	/* STUB: Create data plane listening socket */
+        /* LUA: Run server_init */
 	/* STUB: Set socket options */
 	/* STUB: Bind & listen */
 
@@ -164,6 +176,9 @@ static void run_server(struct thread *t)
 		/* Process events */
 		server_events(t, epfd, events, nfds, fd_listen, buf);
 	}
+
+        /* XXX: Sync threads? */
+        /* LUA: Run server_exit hooks */
 
 	/* Free resources */
 	/* STUB: Free buffers */
