@@ -1,0 +1,26 @@
+# http://EditorConfig.org
+
+# Top-most EditorConfig file
+root = true
+
+# General settings
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+# Source files
+[*.{c,h}]
+indent_style = space
+indent_size = 8
+
+# Makefiles
+[Makefile]
+indent_style = tab
+trim_trailing_whitespace = false
+
+# Lua scripts
+[*.lua]
+indent_style = space
+indent_size = 2
