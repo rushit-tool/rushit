@@ -75,11 +75,23 @@ dummy_test: $(dummy_test-objs)
 
 all: $(binaries)
 
-clean: clean-luajit
+# Clean up just the files that are most likely to change. That is,
+# exclude the dependencies living under vendor/.
+clean:
 	rm -f *.o $(binaries)
+
+# Clean up all files, even those that you usually don't want to
+# rebuild. That is, include the dependencies living under vendor/.
+superclean: clean clean-luajit
 	rm -rf $(staging-dir)
 
-.PHONY: luajit
+.PHONY: all clean superclean
+
+#
+# LuaJIT
+# TODO: Move it to its own Makefile?
+#
+
 luajit: $(luajit-lib)
 
 $(luajit-lib):
@@ -88,3 +100,5 @@ $(luajit-lib):
 
 clean-luajit:
 	$(MAKE) -C $(luajit-dir) clean
+
+.PHONY: clean-luajit luajit
