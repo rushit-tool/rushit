@@ -17,7 +17,7 @@
 # Makefile.
 
 # Madatory flags (required for proper compilation)
-OUR_CPPFLAGS := -D_GNU_SOURCE
+OUR_CPPFLAGS := -D_GNU_SOURCE -I$(top-dir)
 OUR_CFLAGS   :=
 OUR_LDFLAGS  :=
 
@@ -31,9 +31,11 @@ ALL_CPPFLAGS := $(OUR_CPPFLAGS) $(CPPFLAGS)
 ALL_CFLAGS   := $(OUR_CFLAGS) $(CFLAGS)
 ALL_LDFLAGS  := $(OUR_LDFLAGS) $(LDFLAGS)
 
-staging-dir := staging
+# Directory containing this Makefile
+top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+staging-dir := $(top-dir)/staging
 
-luajit-dir := vendor/luajit.org/luajit-2.1
+luajit-dir := $(top-dir)/vendor/luajit.org/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
 
 base-lib := \
@@ -62,7 +64,7 @@ binaries := tcp_rr tcp_stream dummy_test
 ext-libs := -lm -lpthread -lrt
 
 .c.o:
-	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $<
+	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
 
 tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
@@ -95,8 +97,8 @@ superclean: clean clean-luajit
 luajit: $(luajit-lib)
 
 $(luajit-lib):
-	$(MAKE) -C $(luajit-dir) PREFIX=$(abspath $(staging-dir))
-	$(MAKE) -C $(luajit-dir) PREFIX=$(abspath $(staging-dir)) install
+	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
+	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
 
 clean-luajit:
 	$(MAKE) -C $(luajit-dir) clean
