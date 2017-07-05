@@ -23,10 +23,10 @@ LDFLAGS  =
 LDLIBS   =
 
 # Madatory flags (required for proper compilation)
-OUR_CPPFLAGS = -D_GNU_SOURCE -I$(top-dir)
+OUR_CPPFLAGS = -D_GNU_SOURCE -I$(top-dir) -I$(luajit-inc)
 OUR_CFLAGS   =
 OUR_LDFLAGS  =
-OUR_LDLIBS   = -lm -lpthread -lrt
+OUR_LDLIBS   = -ldl -lm -lpthread -lrt
 
 # Merged flags
 ALL_CPPFLAGS = $(OUR_CPPFLAGS) $(CPPFLAGS)
@@ -39,6 +39,7 @@ top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 staging-dir := $(top-dir)/staging
 
 luajit-dir := $(top-dir)/vendor/luajit.org/luajit-2.1
+luajit-inc := $(staging-dir)/include/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
 
 base-lib := \
@@ -69,6 +70,8 @@ default: all
 .c.o:
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
 
+$(base-lib): $(luajit-inc)
+
 tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
@@ -98,6 +101,8 @@ superclean: clean clean-luajit
 #
 
 build-luajit: $(luajit-lib)
+
+$(luajit-inc): $(luajit-lib)
 
 $(luajit-lib):
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
