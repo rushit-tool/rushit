@@ -54,6 +54,7 @@ base-lib := \
 	numlist.o \
 	percentiles.o \
 	sample.o \
+	script_engine.o \
 	thread.o \
 	version.o
 
