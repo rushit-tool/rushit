@@ -64,6 +64,7 @@ dummy_test-objs := dummy_test_main.o dummy_test.o $(all-libs)
 
 binaries := tcp_rr tcp_stream dummy_test
 
+default: all
 
 .c.o:
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
