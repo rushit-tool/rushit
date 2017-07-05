@@ -87,7 +87,7 @@ all: $(binaries)
 # Clean up just the files that are most likely to change. That is,
 # exclude the dependencies living under vendor/.
 clean:
-	rm -f *.o $(binaries)
+	rm -f *.o $(binaries) $(test-binaries)
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
@@ -113,3 +113,22 @@ clean-luajit:
 	$(MAKE) -C $(luajit-dir) clean
 
 .PHONY: build-luajit clean-luajit
+
+#
+# Tests
+#
+
+test-dir := $(top-dir)/tests/unit
+
+test-libs := $(shell pkg-config --libs cmocka)
+
+test-binaries := t_script_engine
+
+t_script_engine-objs := $(test-dir)/t_script_engine.o $(all-libs)
+
+t_script_engine: $(t_script_engine-objs)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS) $(test-libs)
+
+tests: $(test-binaries)
+
+.PHONY: tests
