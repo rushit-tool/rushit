@@ -97,7 +97,7 @@ superclean: clean clean-luajit
 # TODO: Move it to its own Makefile?
 #
 
-luajit: $(luajit-lib)
+build-luajit: $(luajit-lib)
 
 $(luajit-lib):
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
@@ -106,4 +106,4 @@ $(luajit-lib):
 clean-luajit:
 	$(MAKE) -C $(luajit-dir) clean
 
-.PHONY: clean-luajit luajit
+.PHONY: build-luajit clean-luajit
