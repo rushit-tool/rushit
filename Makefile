@@ -17,19 +17,19 @@
 # Makefile.
 
 # Madatory flags (required for proper compilation)
-OUR_CPPFLAGS := -D_GNU_SOURCE -I$(top-dir)
-OUR_CFLAGS   :=
-OUR_LDFLAGS  :=
+OUR_CPPFLAGS = -D_GNU_SOURCE -I$(top-dir)
+OUR_CFLAGS   =
+OUR_LDFLAGS  =
 
 # Recommended flags (may be overridden by the user)
-CPPFLAGS :=
-CFLAGS   := -std=c99 -Wall -Werror -O3 -g
-LDFLAGS  :=
+CPPFLAGS =
+CFLAGS   = -std=c99 -Wall -Werror -O3 -g
+LDFLAGS  =
 
 # Merged flags
-ALL_CPPFLAGS := $(OUR_CPPFLAGS) $(CPPFLAGS)
-ALL_CFLAGS   := $(OUR_CFLAGS) $(CFLAGS)
-ALL_LDFLAGS  := $(OUR_LDFLAGS) $(LDFLAGS)
+ALL_CPPFLAGS = $(OUR_CPPFLAGS) $(CPPFLAGS)
+ALL_CFLAGS   = $(OUR_CFLAGS) $(CFLAGS)
+ALL_LDFLAGS  = $(OUR_LDFLAGS) $(LDFLAGS)
 
 # Directory containing this Makefile
 top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
