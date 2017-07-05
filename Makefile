@@ -20,16 +20,19 @@
 CPPFLAGS =
 CFLAGS   = -std=c99 -Wall -Werror -O3 -g
 LDFLAGS  =
+LDLIBS   =
 
 # Madatory flags (required for proper compilation)
 OUR_CPPFLAGS = -D_GNU_SOURCE -I$(top-dir)
 OUR_CFLAGS   =
 OUR_LDFLAGS  =
+OUR_LDLIBS   = -lm -lpthread -lrt
 
 # Merged flags
 ALL_CPPFLAGS = $(OUR_CPPFLAGS) $(CPPFLAGS)
 ALL_CFLAGS   = $(OUR_CFLAGS) $(CFLAGS)
 ALL_LDFLAGS  = $(OUR_LDFLAGS) $(LDFLAGS)
+ALL_LDLIBS   = $(OUR_LDLIBS) $(LDLIBS)
 
 # Directory containing this Makefile
 top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
@@ -61,19 +64,18 @@ dummy_test-objs := dummy_test_main.o dummy_test.o $(all-libs)
 
 binaries := tcp_rr tcp_stream dummy_test
 
-ext-libs := -lm -lpthread -lrt
 
 .c.o:
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
 
 tcp_rr: $(tcp_rr-objs)
-	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 tcp_stream: $(tcp_stream-objs)
-	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 dummy_test: $(dummy_test-objs)
-	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 all: $(binaries)
 
