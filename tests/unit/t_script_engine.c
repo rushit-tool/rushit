@@ -7,15 +7,15 @@
 
 static void t_se_create_succeeds(void **state)
 {
-        struct script_engine se;
+        struct script_engine *se;
         int rc;
 
         (void) state;
 
-        rc = se_create(&se);
+        rc = script_engine_create(&se);
         assert_return_code(rc, -rc);
 
-        se_destroy(&se);
+        se = script_engine_destroy(se);
 }
 
 int main(void)

@@ -176,7 +176,7 @@ static void ctrl_notify_server(int ctrl_conn, int magic, struct callbacks *cb)
 struct control_plane {
         struct options *opts;
         struct callbacks *cb;
-        struct script_engine se;
+        struct script_engine *script_engine;
         int num_incidents;
         int ctrl_conn;
         int ctrl_port;
@@ -192,7 +192,7 @@ struct control_plane* control_plane_create(struct options *opts,
         cp->opts = opts;
         cp->cb = cb;
 
-        r = se_create(&cp->se);
+        r = script_engine_create(&cp->script_engine);
         if (r < 0)
                 goto err;
 
@@ -271,6 +271,6 @@ void control_plane_destroy(struct control_plane *cp)
 {
         assert(cp);
 
-        se_destroy(&cp->se);
+        cp->script_engine = script_engine_destroy(cp->script_engine);
         free(cp);
 }

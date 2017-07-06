@@ -21,6 +21,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "common.h"
+
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -65,12 +67,17 @@ static const struct sapi_callback script_callbacks[] = {
 /**
  * Initialize script engine state
  */
-int se_create(struct script_engine *se)
+int script_engine_create(struct script_engine **sep)
 {
+        _auto_free_ struct script_engine *se = NULL;
         const struct sapi_callback *cb;
         lua_State *L;
 
-        assert(se);
+        assert(sep);
+
+        se = calloc(1, sizeof(*se));
+        if (!se)
+                return -ENOMEM;
 
         /* Init new Lua state */
         L = luaL_newstate();
@@ -87,20 +94,25 @@ int se_create(struct script_engine *se)
         for (cb = script_callbacks; cb->name; cb++)
                 lua_register(L, cb->name, cb->func);
 
-        memset(se, 0, sizeof(*se));
         se->L = L;
 
+        *sep = se;
+        se = NULL;
         return 0;
 }
 
 /**
  * Destroy script engine state
  */
-void se_destroy(struct script_engine *se)
+struct script_engine *script_engine_destroy(struct script_engine *se)
 {
         assert(se);
 
         lua_close(se->L);
+        se->L = NULL;
+
+        free(se);
+        return NULL;
 }
 
 static int null_cb(lua_State *L)
