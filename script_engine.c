@@ -115,6 +115,54 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         return NULL;
 }
 
+/**
+ * Create an instance of a slave script engine
+ */
+int script_slave_create(struct script_slave **ssp, struct script_engine *se)
+{
+        _auto_free_ struct script_slave *ss = NULL;
+        lua_State *L;
+
+        assert(ssp);
+        assert(se);
+
+        ss = calloc(1, sizeof(*ss));
+        if (!ss)
+                return -ENOMEM;
+
+        L = luaL_newstate();
+        if (!L)
+                return -ENOMEM;
+        luaL_openlibs(L);
+
+        /* TODO: Load prelude */
+
+        /* TODO: Install hooks */
+
+        ss->se = se;
+        ss->L = L;
+
+        *ssp = ss;
+        ss = NULL;
+        return 0;
+}
+
+
+/**
+ * Destroy a slave script engine instance
+ */
+struct script_slave *script_slave_destroy(struct script_slave *ss)
+{
+        assert(ss);
+
+        lua_close(ss->L);
+        ss->L = NULL;
+        ss->se = NULL;
+
+        free(ss);
+        return NULL;
+}
+
 static int null_cb(lua_State *L)
 {
         return 0;
