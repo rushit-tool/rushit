@@ -8,6 +8,9 @@ BUILD:
 * import cmocka into the source tree
 * support for out-of-source-tree builds
 
-COSMETIC:
+COSMETIC/QUALITY:
+* split start_worker_threads() into create_*() and start_*(); right
+  now it is doing two things and the interface is asymmetric with
+  {stop,free}_worker_threads()
 * replace #ifndef NEPER_... header include guards with #pragma once
 * move library sources under lib/ and program sources under src/
