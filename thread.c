@@ -211,9 +211,6 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         control_plane_stop(cp);
         PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
-        control_plane_destroy(cp);
-        se = script_engine_destroy(se);
-
         // begin printing rusage
         PRINT(cb, "time_start", "%ld.%09ld", time_start.tv_sec,
               time_start.tv_nsec);
@@ -239,5 +236,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         report_stats(ts);
         free_worker_threads(opts->num_threads, ts);
+        control_plane_destroy(cp);
+        se = script_engine_destroy(se);
+
         return 0;
 }
