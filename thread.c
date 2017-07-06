@@ -67,7 +67,8 @@ void start_worker_threads(struct options *opts, struct callbacks *cb,
                           struct thread *t, void *(*thread_func)(void *),
                           pthread_barrier_t *ready, struct timespec *time_start,
                           pthread_mutex_t *time_start_mutex,
-                          struct rusage *rusage_start, struct addrinfo *ai)
+                          struct rusage *rusage_start, struct addrinfo *ai,
+                          struct script_engine *se)
 {
         cpu_set_t *cpuset;
         pthread_attr_t attr;
@@ -100,6 +101,12 @@ void start_worker_threads(struct options *opts, struct callbacks *cb,
                 t[i].time_start = time_start;
                 t[i].time_start_mutex = time_start_mutex;
                 t[i].rusage_start = rusage_start;
+
+                s = script_slave_create(&t[i].script_slave, se);
+                if (s < 0) {
+                        LOG_FATAL(cb, "failed to create script slave: %s",
+                                  strerror(-s));
+                }
 
                 if (opts->pin_cpu) {
                         s = pthread_attr_setaffinity_np(&attr,
@@ -160,6 +167,7 @@ static void free_worker_threads(int num_threads, struct thread *t)
                 do_close(t[i].stop_efd);
                 free(t[i].ai);
                 free_samples(t[i].samples);
+                script_slave_destroy(t[i].script_slave);
         }
         free(t);
 }
@@ -198,7 +206,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         // start threads *after* control plane is up, to reuse addrinfo.
         ts = calloc(opts->num_threads, sizeof(struct thread));
         start_worker_threads(opts, cb, ts, thread_func, &ready_barrier,
-                             &time_start, &time_start_mutex, &rusage_start, ai);
+                             &time_start, &time_start_mutex, &rusage_start, ai,
+                             se);
         free(ai);
         LOG_INFO(cb, "started worker threads");
 
