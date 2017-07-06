@@ -15,6 +15,7 @@
  */
 
 #include "control_plane.h"
+#include <assert.h>
 #include <netinet/tcp.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -22,6 +23,7 @@
 #include "hexdump.h"
 #include "lib.h"
 #include "logging.h"
+#include "script_engine.h"
 
 static int recv_magic(int fd, struct callbacks *cb, const char *fn)
 {
@@ -174,6 +176,7 @@ static void ctrl_notify_server(int ctrl_conn, int magic, struct callbacks *cb)
 struct control_plane {
         struct options *opts;
         struct callbacks *cb;
+        struct script_engine se;
         int num_incidents;
         int ctrl_conn;
         int ctrl_port;
@@ -183,11 +186,21 @@ struct control_plane* control_plane_create(struct options *opts,
                                            struct callbacks *cb)
 {
         struct control_plane *cp;
+        int r;
 
         cp = calloc(1, sizeof(*cp));
         cp->opts = opts;
         cp->cb = cb;
+
+        r = se_create(&cp->se);
+        if (r < 0)
+                goto err;
+
         return cp;
+
+err:
+        free(cp);
+        return NULL;
 }
 
 void control_plane_start(struct control_plane *cp, struct addrinfo **ai)
@@ -256,5 +269,8 @@ int control_plane_incidents(struct control_plane *cp)
 
 void control_plane_destroy(struct control_plane *cp)
 {
+        assert(cp);
+
+        se_destroy(&cp->se);
         free(cp);
 }

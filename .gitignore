@@ -1,4 +1,23 @@
+# Build
 *.o
+/staging
+
+# Progs
+dummy_test
 tcp_rr
 tcp_stream
-/staging
+
+# Tests
+t_script_engine
+
+# Backups
+*~
+\#*#
+
+# GNU GLOBAL
+GPATH
+GRTAGS
+GTAGS
+
+# cscope
+cscope.*

@@ -16,24 +16,30 @@
 #
 # Makefile.
 
-# Madatory flags (required for proper compilation)
-OUR_CPPFLAGS := -D_GNU_SOURCE
-OUR_CFLAGS   :=
-OUR_LDFLAGS  :=
+# Recommended flags (may be overridden by the user from environment/command line)
+CPPFLAGS =
+CFLAGS   = -std=c99 -Wall -Werror -O3 -g
+LDFLAGS  =
+LDLIBS   =
 
-# Recommended flags (may be overridden by the user)
-CPPFLAGS :=
-CFLAGS   := -std=c99 -Wall -Werror -O3 -g
-LDFLAGS  :=
+# Madatory flags (required for proper compilation)
+OUR_CPPFLAGS = -D_GNU_SOURCE -I$(top-dir) -I$(luajit-inc)
+OUR_CFLAGS   =
+OUR_LDFLAGS  =
+OUR_LDLIBS   = -ldl -lm -lpthread -lrt
 
 # Merged flags
-ALL_CPPFLAGS := $(OUR_CPPFLAGS) $(CPPFLAGS)
-ALL_CFLAGS   := $(OUR_CFLAGS) $(CFLAGS)
-ALL_LDFLAGS  := $(OUR_LDFLAGS) $(LDFLAGS)
+ALL_CPPFLAGS = $(OUR_CPPFLAGS) $(CPPFLAGS)
+ALL_CFLAGS   = $(OUR_CFLAGS) $(CFLAGS)
+ALL_LDFLAGS  = $(OUR_LDFLAGS) $(LDFLAGS)
+ALL_LDLIBS   = $(OUR_LDLIBS) $(LDLIBS)
 
-staging-dir := staging
+# Directory containing this Makefile
+top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
+staging-dir := $(top-dir)/staging
 
-luajit-dir := vendor/luajit.org/luajit-2.1
+luajit-dir := $(top-dir)/vendor/luajit.org/luajit-2.1
+luajit-inc := $(staging-dir)/include/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
 
 base-lib := \
@@ -48,6 +54,7 @@ base-lib := \
 	numlist.o \
 	percentiles.o \
 	sample.o \
+	script_engine.o \
 	thread.o \
 	version.o
 
@@ -59,26 +66,28 @@ dummy_test-objs := dummy_test_main.o dummy_test.o $(all-libs)
 
 binaries := tcp_rr tcp_stream dummy_test
 
-ext-libs := -lm -lpthread -lrt
+default: all
 
 .c.o:
-	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $<
+	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
+
+$(base-lib): $(luajit-inc)
 
 tcp_rr: $(tcp_rr-objs)
-	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 tcp_stream: $(tcp_stream-objs)
-	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 dummy_test: $(dummy_test-objs)
-	$(CC) -o $@ $^ $(ext-libs) $(ALL_CFLAGS) $(ALL_LDFLAGS)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 all: $(binaries)
 
 # Clean up just the files that are most likely to change. That is,
 # exclude the dependencies living under vendor/.
 clean:
-	rm -f *.o $(binaries)
+	rm -f *.o $(binaries) $(test-binaries)
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
@@ -92,13 +101,34 @@ superclean: clean clean-luajit
 # TODO: Move it to its own Makefile?
 #
 
-luajit: $(luajit-lib)
+build-luajit: $(luajit-lib)
+
+$(luajit-inc): $(luajit-lib)
 
 $(luajit-lib):
-	$(MAKE) -C $(luajit-dir) PREFIX=$(abspath $(staging-dir))
-	$(MAKE) -C $(luajit-dir) PREFIX=$(abspath $(staging-dir)) install
+	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
+	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
 
 clean-luajit:
 	$(MAKE) -C $(luajit-dir) clean
 
-.PHONY: clean-luajit luajit
+.PHONY: build-luajit clean-luajit
+
+#
+# Tests
+#
+
+test-dir := $(top-dir)/tests/unit
+
+test-libs := $(shell pkg-config --libs cmocka)
+
+test-binaries := t_script_engine
+
+t_script_engine-objs := $(test-dir)/t_script_engine.o $(all-libs)
+
+t_script_engine: $(t_script_engine-objs)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS) $(test-libs)
+
+tests: $(test-binaries)
+
+.PHONY: tests
