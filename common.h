@@ -32,6 +32,11 @@
 
 #define PROCFILE_SOMAXCONN "/proc/sys/net/core/somaxconn"
 
+
+static inline void freep(void *p) { free(*(void **) p); }
+#define _auto_free_ __attribute__((cleanup(freep)))
+
+
 static inline void epoll_ctl_or_die(int epfd, int op, int fd,
                                     struct epoll_event *ev,
                                     struct callbacks *cb)

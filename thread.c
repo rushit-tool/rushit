@@ -26,6 +26,7 @@
 #include "cpuinfo.h"
 #include "logging.h"
 #include "sample.h"
+#include "script_engine.h"
 
 static int get_cpuset(cpu_set_t *cpuset, struct callbacks *cb)
 {
@@ -66,7 +67,8 @@ void start_worker_threads(struct options *opts, struct callbacks *cb,
                           struct thread *t, void *(*thread_func)(void *),
                           pthread_barrier_t *ready, struct timespec *time_start,
                           pthread_mutex_t *time_start_mutex,
-                          struct rusage *rusage_start, struct addrinfo *ai)
+                          struct rusage *rusage_start, struct addrinfo *ai,
+                          struct script_engine *se)
 {
         cpu_set_t *cpuset;
         pthread_attr_t attr;
@@ -99,6 +101,12 @@ void start_worker_threads(struct options *opts, struct callbacks *cb,
                 t[i].time_start = time_start;
                 t[i].time_start_mutex = time_start_mutex;
                 t[i].rusage_start = rusage_start;
+
+                s = script_slave_create(&t[i].script_slave, se);
+                if (s < 0) {
+                        LOG_FATAL(cb, "failed to create script slave: %s",
+                                  strerror(-s));
+                }
 
                 if (opts->pin_cpu) {
                         s = pthread_attr_setaffinity_np(&attr,
@@ -159,6 +167,7 @@ static void free_worker_threads(int num_threads, struct thread *t)
                 do_close(t[i].stop_efd);
                 free(t[i].ai);
                 free_samples(t[i].samples);
+                script_slave_destroy(t[i].script_slave);
         }
         free(t);
 }
@@ -178,18 +187,27 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         struct addrinfo *ai;
         struct thread *ts; // worker threads
         struct control_plane *cp;
+        struct script_engine *se;
+        int r;
 
         PRINT(cb, "total_run_time", "%d", opts->test_length);
         if (opts->dry_run)
                 return 0;
 
-        cp = control_plane_create(opts, cb);
+        r = script_engine_create(&se);
+        if (r < 0)
+                LOG_FATAL(cb, "failed to create script engine: %s", strerror(-r));
+
+        cp = control_plane_create(opts, cb, se);
+        if (!cp)
+                LOG_FATAL(cb, "failed to create control plane");
         control_plane_start(cp, &ai);
 
         // start threads *after* control plane is up, to reuse addrinfo.
         ts = calloc(opts->num_threads, sizeof(struct thread));
         start_worker_threads(opts, cb, ts, thread_func, &ready_barrier,
-                             &time_start, &time_start_mutex, &rusage_start, ai);
+                             &time_start, &time_start_mutex, &rusage_start, ai,
+                             se);
         free(ai);
         LOG_INFO(cb, "started worker threads");
 
@@ -202,8 +220,6 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         control_plane_stop(cp);
         PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
-        control_plane_destroy(cp);
-
         // begin printing rusage
         PRINT(cb, "time_start", "%ld.%09ld", time_start.tv_sec,
               time_start.tv_nsec);
@@ -229,5 +245,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         report_stats(ts);
         free_worker_threads(opts->num_threads, ts);
+        control_plane_destroy(cp);
+        se = script_engine_destroy(se);
+
         return 0;
 }

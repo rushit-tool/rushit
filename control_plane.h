@@ -21,9 +21,11 @@ struct addrinfo;
 struct callbacks;
 struct control_plane;
 struct options;
+struct script_engine;
 
 struct control_plane* control_plane_create(struct options *opts,
-                                           struct callbacks *cb);
+                                           struct callbacks *cb,
+                                           struct script_engine *se);
 void control_plane_start(struct control_plane *cp, struct addrinfo **ai);
 void control_plane_wait_until_done(struct control_plane *cp);
 void control_plane_stop(struct control_plane *cp);

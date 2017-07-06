@@ -20,6 +20,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include "lib.h"
+#include "script_engine.h"
 
 struct sample;
 
@@ -38,6 +39,7 @@ struct thread {
         struct timespec *time_start;
         pthread_mutex_t *time_start_mutex;
         struct rusage *rusage_start;
+        struct script_slave *script_slave;
 };
 
 int run_main_thread(struct options *opts, struct callbacks *cb,

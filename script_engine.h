@@ -23,7 +23,15 @@ struct script_engine {
         struct lua_State *L;
 };
 
-int se_create(struct script_engine *se);
-void se_destroy(struct script_engine *se);
+struct script_slave {
+        struct script_engine *se;
+        struct lua_State *L;
+};
+
+int script_engine_create(struct script_engine **sep);
+struct script_engine *script_engine_destroy(struct script_engine *se);
+
+int script_slave_create(struct script_slave **ssp, struct script_engine *se);
+struct script_slave *script_slave_destroy(struct script_slave *ss);
 
 #endif

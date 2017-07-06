@@ -21,6 +21,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "common.h"
+
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
@@ -63,14 +65,19 @@ static const struct sapi_callback script_callbacks[] = {
 
 
 /**
- * Initialize script engine state
+ * Create an instance of a script engine
  */
-int se_create(struct script_engine *se)
+int script_engine_create(struct script_engine **sep)
 {
+        _auto_free_ struct script_engine *se = NULL;
         const struct sapi_callback *cb;
         lua_State *L;
 
-        assert(se);
+        assert(sep);
+
+        se = calloc(1, sizeof(*se));
+        if (!se)
+                return -ENOMEM;
 
         /* Init new Lua state */
         L = luaL_newstate();
@@ -87,20 +94,73 @@ int se_create(struct script_engine *se)
         for (cb = script_callbacks; cb->name; cb++)
                 lua_register(L, cb->name, cb->func);
 
-        memset(se, 0, sizeof(*se));
         se->L = L;
 
+        *sep = se;
+        se = NULL;
         return 0;
 }
 
 /**
- * Destroy script engine state
+ * Destroy a script engine instance
  */
-void se_destroy(struct script_engine *se)
+struct script_engine *script_engine_destroy(struct script_engine *se)
 {
         assert(se);
 
         lua_close(se->L);
+        se->L = NULL;
+
+        free(se);
+        return NULL;
+}
+
+/**
+ * Create an instance of a slave script engine
+ */
+int script_slave_create(struct script_slave **ssp, struct script_engine *se)
+{
+        _auto_free_ struct script_slave *ss = NULL;
+        lua_State *L;
+
+        assert(ssp);
+        assert(se);
+
+        ss = calloc(1, sizeof(*ss));
+        if (!ss)
+                return -ENOMEM;
+
+        L = luaL_newstate();
+        if (!L)
+                return -ENOMEM;
+        luaL_openlibs(L);
+
+        /* TODO: Load prelude */
+
+        /* TODO: Install hooks */
+
+        ss->se = se;
+        ss->L = L;
+
+        *ssp = ss;
+        ss = NULL;
+        return 0;
+}
+
+
+/**
+ * Destroy a slave script engine instance
+ */
+struct script_slave *script_slave_destroy(struct script_slave *ss)
+{
+        assert(ss);
+
+        lua_close(ss->L);
+        ss->L = NULL;
+        ss->se = NULL;
+
+        free(ss);
+        return NULL;
 }
 
 static int null_cb(lua_State *L)
