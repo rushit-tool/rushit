@@ -65,7 +65,7 @@ static const struct sapi_callback script_callbacks[] = {
 
 
 /**
- * Initialize script engine state
+ * Create an instance of a script engine
  */
 int script_engine_create(struct script_engine **sep)
 {
@@ -102,7 +102,7 @@ int script_engine_create(struct script_engine **sep)
 }
 
 /**
- * Destroy script engine state
+ * Destroy a script engine instance
  */
 struct script_engine *script_engine_destroy(struct script_engine *se)
 {

@@ -5,15 +5,16 @@
 
 #include "script_engine.h"
 
-static void t_se_create_succeeds(void **state)
+static void t_create_script_engine(void **state)
 {
         struct script_engine *se;
-        int rc;
+        int r;
 
         (void) state;
 
-        rc = script_engine_create(&se);
-        assert_return_code(rc, -rc);
+        r = script_engine_create(&se);
+        assert_return_code(r, -r);
+        assert_non_null(se);
 
         se = script_engine_destroy(se);
 }
@@ -21,7 +22,7 @@ static void t_se_create_succeeds(void **state)
 int main(void)
 {
         const struct CMUnitTest tests[] = {
-                cmocka_unit_test(t_se_create_succeeds),
+                cmocka_unit_test(t_create_script_engine),
         };
 
         return cmocka_run_group_tests(tests, NULL, NULL);
