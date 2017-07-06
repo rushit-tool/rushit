@@ -1,0 +1,13 @@
+BUGS:
+* Clang static analyzer shows points out some issues, run `scan-build
+  make` to investigate
+* logging to standard error doesn't work when the process is launched
+  from a directory that is not writable (i.e. can't create a log file)
+
+BUILD:
+* import cmocka into the source tree
+* support for out-of-source-tree builds
+
+COSMETIC:
+* replace #ifndef NEPER_... header include guards with #pragma once
+* move library sources under lib/ and program sources under src/
