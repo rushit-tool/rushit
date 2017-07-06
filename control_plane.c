@@ -183,24 +183,17 @@ struct control_plane {
 };
 
 struct control_plane* control_plane_create(struct options *opts,
-                                           struct callbacks *cb)
+                                           struct callbacks *cb,
+                                           struct script_engine *se)
 {
         struct control_plane *cp;
-        int r;
 
         cp = calloc(1, sizeof(*cp));
         cp->opts = opts;
         cp->cb = cb;
-
-        r = script_engine_create(&cp->script_engine);
-        if (r < 0)
-                goto err;
+        cp->script_engine = se;
 
         return cp;
-
-err:
-        free(cp);
-        return NULL;
 }
 
 void control_plane_start(struct control_plane *cp, struct addrinfo **ai)
@@ -269,8 +262,5 @@ int control_plane_incidents(struct control_plane *cp)
 
 void control_plane_destroy(struct control_plane *cp)
 {
-        assert(cp);
-
-        cp->script_engine = script_engine_destroy(cp->script_engine);
         free(cp);
 }

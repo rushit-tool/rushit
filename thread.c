@@ -26,6 +26,7 @@
 #include "cpuinfo.h"
 #include "logging.h"
 #include "sample.h"
+#include "script_engine.h"
 
 static int get_cpuset(cpu_set_t *cpuset, struct callbacks *cb)
 {
@@ -178,12 +179,20 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         struct addrinfo *ai;
         struct thread *ts; // worker threads
         struct control_plane *cp;
+        struct script_engine *se;
+        int r;
 
         PRINT(cb, "total_run_time", "%d", opts->test_length);
         if (opts->dry_run)
                 return 0;
 
-        cp = control_plane_create(opts, cb);
+        r = script_engine_create(&se);
+        if (r < 0)
+                LOG_FATAL(cb, "failed to create script engine: %s", strerror(-r));
+
+        cp = control_plane_create(opts, cb, se);
+        if (!cp)
+                LOG_FATAL(cb, "failed to create control plane");
         control_plane_start(cp, &ai);
 
         // start threads *after* control plane is up, to reuse addrinfo.
@@ -203,6 +212,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         control_plane_stop(cp);
         PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
         control_plane_destroy(cp);
+        se = script_engine_destroy(se);
 
         // begin printing rusage
         PRINT(cb, "time_start", "%ld.%09ld", time_start.tv_sec,
