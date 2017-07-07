@@ -23,7 +23,7 @@
 #include "hexdump.h"
 #include "lib.h"
 #include "logging.h"
-#include "script_engine.h"
+#include "script.h"
 
 static int recv_magic(int fd, struct callbacks *cb, const char *fn)
 {

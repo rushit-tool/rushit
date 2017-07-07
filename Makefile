@@ -54,7 +54,7 @@ base-lib := \
 	numlist.o \
 	percentiles.o \
 	sample.o \
-	script_engine.o \
+	script.o \
 	thread.o \
 	version.o
 
@@ -122,11 +122,11 @@ test-dir := $(top-dir)/tests/unit
 
 test-libs := $(shell pkg-config --libs cmocka)
 
-test-binaries := t_script_engine
+test-binaries := t_script
 
-t_script_engine-objs := $(test-dir)/t_script_engine.o $(all-libs)
+t_script-objs := $(test-dir)/t_script.o $(all-libs)
 
-t_script_engine: $(t_script_engine-objs)
+t_script: $(t_script-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS) $(test-libs)
 
 tests: $(test-binaries)

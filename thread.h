@@ -20,7 +20,7 @@
 #include <pthread.h>
 #include <stdbool.h>
 #include "lib.h"
-#include "script_engine.h"
+#include "script.h"
 
 struct sample;
 

@@ -3,7 +3,7 @@
 #include <setjmp.h>
 #include <cmocka.h>
 
-#include "script_engine.h"
+#include "script.h"
 
 static void t_create_script_engine(void **state)
 {

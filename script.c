@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "script_engine.h"
+#include "script.h"
 
 #include <assert.h>
 #include <errno.h>

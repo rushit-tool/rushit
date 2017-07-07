@@ -26,7 +26,7 @@
 #include "cpuinfo.h"
 #include "logging.h"
 #include "sample.h"
-#include "script_engine.h"
+#include "script.h"
 
 static int get_cpuset(cpu_set_t *cpuset, struct callbacks *cb)
 {

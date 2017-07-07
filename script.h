@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef NEPER_SCRIPT_ENGINE_H
-#define NEPER_SCRIPT_ENGINE_H
+#ifndef NEPER_SCRIPT_H
+#define NEPER_SCRIPT_H
 
 struct lua_State;
 

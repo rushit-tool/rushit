@@ -8,7 +8,7 @@ tcp_rr
 tcp_stream
 
 # Tests
-t_script_engine
+t_script
 
 # Backups
 *~
