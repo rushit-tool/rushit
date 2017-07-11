@@ -28,15 +28,6 @@
 #include "lualib.h"
 
 
-/**
- * Script API callback from Lua to C
- */
-struct sapi_callback {
-        const char *name;
-        lua_CFunction func;
-};
-
-
 static int null_cb(lua_State *L);
 
 
@@ -46,7 +37,7 @@ static int null_cb(lua_State *L);
 
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
-static const struct sapi_callback script_callbacks[] = {
+static const struct luaL_Reg script_callbacks[] = {
         { "client_error", null_cb },
         { "client_exit",  null_cb },
         { "client_init",  null_cb },
@@ -70,7 +61,6 @@ static const struct sapi_callback script_callbacks[] = {
 int script_engine_create(struct script_engine **sep)
 {
         _auto_free_ struct script_engine *se = NULL;
-        const struct sapi_callback *cb;
         lua_State *L;
 
         assert(sep);
@@ -84,20 +74,18 @@ int script_engine_create(struct script_engine **sep)
         if (!L)
                 return -ENOMEM;
         luaL_openlibs(L);
+        /* Register Lua to C callbacks (script API) */
+        luaL_register(L, "", script_callbacks);
 
-        /* Store context for C callbacks */
+        /* Set context for Lua to C callbacks */
         lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
         lua_pushlightuserdata(L, se);
         lua_settable(L, LUA_REGISTRYINDEX);
 
-        /* Register script API callbacks */
-        for (cb = script_callbacks; cb->name; cb++)
-                lua_register(L, cb->name, cb->func);
-
         se->L = L;
-
         *sep = se;
         se = NULL;
+
         return 0;
 }
 
