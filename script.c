@@ -58,7 +58,7 @@ static const struct luaL_Reg script_callbacks[] = {
 /**
  * Create an instance of a script engine
  */
-int script_engine_create(struct script_engine **sep)
+int script_engine_create(struct script_engine **sep, struct callbacks *cb)
 {
         _auto_free_ struct script_engine *se = NULL;
         lua_State *L;
@@ -83,6 +83,8 @@ int script_engine_create(struct script_engine **sep)
         lua_settable(L, LUA_REGISTRYINDEX);
 
         se->L = L;
+        se->cb = cb;
+
         *sep = se;
         se = NULL;
 
