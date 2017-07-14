@@ -108,6 +108,21 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         return NULL;
 }
 
+int script_engine_run_string(struct script_engine *se, const char *script)
+{
+        int r;
+
+        assert(se);
+
+        r = luaL_dostring(se->L, script);
+        if (r > 0) {
+                LOG_ERROR(se->cb, "luaL_dostring: %s", lua_tostring(se->L, -1));
+                return -r; /* TODO: remap Lua error codes? */
+        }
+
+        return 0;
+}
+
 /**
  * Create an instance of a slave script engine
  */

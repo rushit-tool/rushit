@@ -35,4 +35,10 @@ struct script_engine *script_engine_destroy(struct script_engine *se);
 int script_slave_create(struct script_slave **ssp, struct script_engine *se);
 struct script_slave *script_slave_destroy(struct script_slave *ss);
 
+/**
+ * Runs the given script passed in a string. Returns 0 on success or a negative
+ * value on error.
+ */
+int script_engine_run_string(struct script_engine *se, const char *script);
+
 #endif
