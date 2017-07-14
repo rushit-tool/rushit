@@ -61,6 +61,7 @@ static const struct luaL_Reg script_callbacks[] = {
 int script_engine_create(struct script_engine **sep, struct callbacks *cb)
 {
         _auto_free_ struct script_engine *se = NULL;
+        const struct luaL_Reg *f;
         lua_State *L;
 
         assert(sep);
@@ -74,8 +75,10 @@ int script_engine_create(struct script_engine **sep, struct callbacks *cb)
         if (!L)
                 return -ENOMEM;
         luaL_openlibs(L);
-        /* Register Lua to C callbacks (script API) */
-        luaL_register(L, "", script_callbacks);
+        /* Register Lua to C callbacks (script API)
+         * TODO: Switch to a single call to luaL_register()? */
+        for (f = script_callbacks; f->name; f++)
+                lua_register(L, f->name, f->func);
 
         /* Set context for Lua to C callbacks */
         lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
