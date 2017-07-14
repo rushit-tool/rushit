@@ -28,29 +28,96 @@
 #include "lualib.h"
 
 
-static int null_cb(lua_State *L);
-
-
 /*
  * Keys to Lua registry where we store hook functions and context.
  */
 
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
+
+/*
+ * Lua to C callbacks
+ */
+
+static int client_init_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int client_exit_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int client_read_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int client_write_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int client_error_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int server_init_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int server_exit_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int server_read_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int server_write_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int server_error_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int is_client_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int is_server_cb(lua_State *L)
+{
+        return 0;
+}
+
+static int tid_iter_cb(lua_State *L)
+{
+        return 0;
+}
+
 static const struct luaL_Reg script_callbacks[] = {
-        { "client_error", null_cb },
-        { "client_exit",  null_cb },
-        { "client_init",  null_cb },
-        { "client_read",  null_cb },
-        { "client_write", null_cb },
-        { "is_client",    null_cb },
-        { "is_server",    null_cb },
-        { "server_error", null_cb },
-        { "server_exit",  null_cb },
-        { "server_init",  null_cb },
-        { "server_read",  null_cb },
-        { "server_write", null_cb },
-        { "tid_iter",     null_cb },
+        { "client_init",  client_init_cb },
+        { "client_exit",  client_exit_cb },
+        { "client_read",  client_read_cb },
+        { "client_write", client_write_cb },
+        { "client_error", client_error_cb },
+        { "server_init",  server_init_cb },
+        { "server_exit",  server_exit_cb },
+        { "server_read",  server_read_cb },
+        { "server_write", server_write_cb },
+        { "server_error", server_error_cb },
+        { "is_client",    is_client_cb },
+        { "is_server",    is_server_cb },
+        { "tid_iter",     tid_iter_cb },
         { NULL, NULL },
 };
 
@@ -171,7 +238,3 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
         return NULL;
 }
 
-static int null_cb(lua_State *L)
-{
-        return 0;
-}
