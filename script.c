@@ -238,3 +238,7 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
         return NULL;
 }
 
+void script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
+{
+        /* TODO: Get init hook from master and run it */
+}

@@ -17,6 +17,7 @@
 #ifndef NEPER_SCRIPT_H
 #define NEPER_SCRIPT_H
 
+struct addrinfo;
 struct lua_State;
 
 struct script_engine {
@@ -40,5 +41,8 @@ struct script_slave *script_slave_destroy(struct script_slave *ss);
  * value on error.
  */
 int script_engine_run_string(struct script_engine *se, const char *script);
+
+/* Callbacks for the client/server workloads */
+void script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai);
 
 #endif
