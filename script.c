@@ -215,6 +215,7 @@ int script_slave_create(struct script_slave **ssp, struct script_engine *se)
         /* TODO: Install hooks */
 
         ss->se = se;
+        ss->cb = se->cb;
         ss->L = L;
 
         *ssp = ss;
