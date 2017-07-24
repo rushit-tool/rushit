@@ -114,12 +114,14 @@ static void t_hooks_run_without_errors(void **state)
         }
 }
 
+#define engine_unit_test(f) cmocka_unit_test_setup_teardown((f), engine_setup, engine_teardown)
+
 int main(void)
 {
         const struct CMUnitTest tests[] = {
                 cmocka_unit_test(t_create_script_engine),
                 cmocka_unit_test(t_create_script_slave),
-                cmocka_unit_test_setup_teardown(t_hooks_run_without_errors, engine_setup, engine_teardown),
+                engine_unit_test(t_hooks_run_without_errors),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);
