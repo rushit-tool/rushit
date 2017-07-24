@@ -210,11 +210,18 @@ void control_plane_start(struct control_plane *cp, struct addrinfo **ai)
         }
 }
 
-void control_plane_wait_until_done(struct control_plane *cp)
+static void client_wait(void *cp_)
+{
+        struct control_plane *cp = cp_;
+
+        sleep(cp->opts->test_length);
+        LOG_INFO(cp->cb, "finished sleep");
+}
+
+void control_plane_wait_until_done(struct control_plane *cp, struct script_engine *se)
 {
         if (cp->opts->client) {
-                sleep(cp->opts->test_length);
-                LOG_INFO(cp->cb, "finished sleep");
+                script_engine_run(se, client_wait, cp);
         } else {
                 const int n = cp->opts->num_clients;
                 int* client_fds = calloc(n, sizeof(int));

@@ -191,6 +191,14 @@ int script_engine_run_string(struct script_engine *se, const char *script)
 }
 
 /**
+ * Run the script through the engine...
+ */
+void script_engine_run(struct script_engine *se, void (*wait_func)(void *data), void *data)
+{
+        (*wait_func)(data);
+}
+
+/**
  * Create an instance of a slave script engine
  */
 int script_slave_create(struct script_slave **ssp, struct script_engine *se)

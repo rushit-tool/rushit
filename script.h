@@ -42,6 +42,7 @@ struct script_slave *script_slave_destroy(struct script_slave *ss);
  * value on error.
  */
 int script_engine_run_string(struct script_engine *se, const char *script);
+void script_engine_run(struct script_engine *se, void (*wait_func)(void *data), void *data);
 
 /* Callbacks for the client/server workloads */
 int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai);
