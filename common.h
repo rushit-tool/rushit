@@ -32,6 +32,7 @@
 
 #define PROCFILE_SOMAXCONN "/proc/sys/net/core/somaxconn"
 
+#define ARRAY_SIZE(a) (sizeof((a))/sizeof((a)[0]))
 #define UNUSED(x) ((void) (x))
 
 static inline void free_cleanup(void *p) { free(*(void **) p); }

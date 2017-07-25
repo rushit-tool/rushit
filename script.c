@@ -326,8 +326,6 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
         return NULL;
 }
 
-#define ARRAY_SIZE(a) (sizeof((a))/sizeof((a)[0]))
-
 static struct script_hook *script_engine_get_hook(struct script_engine *se,
                                                   int hook_idx)
 {
