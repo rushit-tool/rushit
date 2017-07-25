@@ -294,10 +294,11 @@ static struct script_hook *script_engine_put_hook(struct script_hook *hook)
 {
         return NULL;
 }
+DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
 
 int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
 {
-        struct script_hook *h;
+        CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         int err;
 
         h = script_engine_get_hook(ss->se, SCRIPT_HOOK_INIT);
@@ -317,7 +318,6 @@ int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
                 return -err;
         }
 
-        h = script_engine_put_hook(h);
 
         return 0;
 }

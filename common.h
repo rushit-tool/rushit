@@ -34,6 +34,13 @@
 
 static inline void free_cleanup(void *p) { free(*(void **) p); }
 #define CLEANUP(f) __attribute__((cleanup(f##_cleanup)))
+#define DEFINE_CLEANUP_FUNC(func, type)                 \
+        static inline void func##_cleanup(type *p)      \
+        {                                               \
+                if (*p)                                 \
+                        func(*p);                       \
+        }                                               \
+        struct allow_trailing_semicolon
 
 static inline void epoll_ctl_or_die(int epfd, int op, int fd,
                                     struct epoll_event *ev,
