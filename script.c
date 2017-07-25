@@ -302,6 +302,8 @@ int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
         int err, res;
 
         h = script_engine_get_hook(ss->se, SCRIPT_HOOK_INIT);
+        if (!h)
+                return 0;
 
         err = luaL_loadbuffer(ss->L, h->bytecode, h->bytecode_len, h->name);
         if (err) {
