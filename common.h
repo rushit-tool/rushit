@@ -32,6 +32,8 @@
 
 #define PROCFILE_SOMAXCONN "/proc/sys/net/core/somaxconn"
 
+#define UNUSED(x) ((void) (x))
+
 static inline void free_cleanup(void *p) { free(*(void **) p); }
 #define CLEANUP(f) __attribute__((cleanup(f##_cleanup)))
 #define DEFINE_CLEANUP_FUNC(func, type)                 \

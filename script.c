@@ -34,6 +34,12 @@
 
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
+static const char *hook_names[SCRIPT_HOOK_MAX] = {
+        [SCRIPT_HOOK_INIT] = "init",
+};
+
+static void script_engine_set_hook(struct script_engine *se, int hook_idx,
+                                   const char *bytecode, size_t length);
 
 struct Lstring {
         char *data;
@@ -64,8 +70,51 @@ static void Lstring_free(struct Lstring *s)
  * Lua to C callbacks
  */
 
+static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
+{
+        UNUSED(L);
+        luaL_addlstring(buf, str, len);
+        return 0;
+}
+
 static int client_init_cb(lua_State *L)
 {
+        struct script_engine *se;
+        const char *buf;
+        size_t len = 0;
+        luaL_Buffer B;
+        int err;
+
+        /* Expect a function argument */
+        luaL_checktype(L, 1, LUA_TFUNCTION);
+
+        /* Get context */
+        lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        se = lua_touserdata(L, -1);
+        lua_pop(L, 1);
+
+        assert(se);
+
+        /* Dump function bytecode */
+        luaL_buffinit(L, &B);
+        err = lua_dump(L, string_writer, &B);
+        if (err)
+                LOG_FATAL(se->cb, "lua_dump: %s", lua_tostring(L, -1));
+        luaL_pushresult(&B);
+        buf = lua_tolstring(L, -1, &len);
+        if (!buf || !len)
+                LOG_FATAL(se->cb, "lua_dump returned an empty buffer");
+
+        script_engine_set_hook(se, SCRIPT_HOOK_INIT, buf, len);
+
+        buf = NULL;
+        len = 0;
+        lua_pop(L, 1);
+
+        /* TODO: Upvalues */
+        /* TODO: Globals */
+
         return 0;
 }
 
@@ -292,6 +341,21 @@ static struct script_hook *script_engine_put_hook(struct script_hook *hook)
         return NULL;
 }
 DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
+
+static void script_engine_set_hook(struct script_engine *se, int hook_idx,
+                                   const char *bytecode, size_t bytecode_len)
+{
+        struct script_hook *h;
+
+        assert(se);
+        assert(hook_idx == SCRIPT_HOOK_INIT);
+
+        h = &se->hooks[hook_idx];
+        h->name = hook_names[hook_idx];
+        if (h->bytecode)
+                Lstring_free(h->bytecode);
+        h->bytecode = Lstring_new(bytecode, bytecode_len);
+}
 
 int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
 {
