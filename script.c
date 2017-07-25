@@ -127,7 +127,7 @@ static const struct luaL_Reg script_callbacks[] = {
  */
 int script_engine_create(struct script_engine **sep, struct callbacks *cb)
 {
-        _auto_free_ struct script_engine *se = NULL;
+        CLEANUP(free) struct script_engine *se = NULL;
         const struct luaL_Reg *f;
         lua_State *L;
 
@@ -203,7 +203,7 @@ void script_engine_run(struct script_engine *se, void (*wait_func)(void *data), 
  */
 int script_slave_create(struct script_slave **ssp, struct script_engine *se)
 {
-        _auto_free_ struct script_slave *ss = NULL;
+        CLEANUP(free) struct script_slave *ss = NULL;
         lua_State *L;
 
         assert(ssp);
