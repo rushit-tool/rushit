@@ -35,6 +35,31 @@
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 
+struct Lstring {
+        char *data;
+        size_t len;
+};
+
+static struct Lstring *Lstring_new(const char *data, size_t len)
+{
+        struct Lstring *s;
+
+        assert(data);
+
+        s = calloc(1, sizeof(*s) + len + 1);
+        assert(s);
+        s->data = (void *) (s + 1);
+        s->len = len;
+        memcpy(s->data, data, len);
+
+        return s;
+}
+
+static void Lstring_free(struct Lstring *s)
+{
+        free(s);
+}
+
 /*
  * Lua to C callbacks
  */
