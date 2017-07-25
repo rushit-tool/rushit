@@ -19,10 +19,22 @@
 
 struct addrinfo;
 struct lua_State;
+struct Lstring;
+
+enum {
+        SCRIPT_HOOK_INIT = 0,
+        SCRIPT_HOOK_MAX
+};
+
+struct script_hook {
+        const char *name;
+        struct Lstring *bytecode;
+};
 
 struct script_engine {
         struct lua_State *L;
         struct callbacks *cb;
+        struct script_hook hooks[SCRIPT_HOOK_MAX];
 };
 
 struct script_slave {

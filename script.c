@@ -191,10 +191,15 @@ int script_engine_create(struct script_engine **sep, struct callbacks *cb)
  */
 struct script_engine *script_engine_destroy(struct script_engine *se)
 {
+        struct script_hook *h;
+
         assert(se);
 
         lua_close(se->L);
         se->L = NULL;
+
+        for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++)
+                Lstring_free(h->bytecode);
 
         free(se);
         return NULL;
@@ -272,47 +277,14 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
         return NULL;
 }
 
-enum {
-        SCRIPT_HOOK_INIT = 0,
-};
-
-struct script_hook {
-        char *name;
-        char *bytecode;
-        size_t bytecode_len;
-
-};
-
 #define ARRAY_SIZE(a) (sizeof((a))/sizeof((a)[0]))
 
 static struct script_hook *script_engine_get_hook(struct script_engine *se,
                                                   int hook_idx)
 {
-        /*
-         * function ()
-         *   return 42
-         * end
-         */
-        static char init_hook_bytecode[] = {
-                0x1b, 0x4c, 0x4a, 0x02, 0x00, 0x10, 0x40, 0x63,
-                0x6f, 0x70, 0x79, 0x5f, 0x68, 0x6f, 0x6f, 0x6b,
-                0x5f, 0x34, 0x2e, 0x6c, 0x75, 0x61, 0x15, 0x00,
-                0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x03, 0x02,
-                0x02, 0x29, 0x00, 0x2a, 0x00, 0x4c, 0x00, 0x02,
-                0x00, 0x01, 0x01, 0x00, 0x00,
-        };
-
-        static struct script_hook hooks[] = {
-                [SCRIPT_HOOK_INIT] = {
-                        .name = "init",
-                        .bytecode = init_hook_bytecode,
-                        .bytecode_len = ARRAY_SIZE(init_hook_bytecode),
-                }
-        };
-
         assert(hook_idx == SCRIPT_HOOK_INIT);
 
-        return &hooks[hook_idx];
+        return &se->hooks[hook_idx];
 }
 
 static struct script_hook *script_engine_put_hook(struct script_hook *hook)
@@ -330,7 +302,7 @@ int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
         if (!h)
                 return 0;
 
-        err = luaL_loadbuffer(ss->L, h->bytecode, h->bytecode_len, h->name);
+        err = luaL_loadbuffer(ss->L, h->bytecode->data, h->bytecode->len, h->name);
         if (err) {
                 LOG_ERROR(ss->cb, "luaL_loadbuffer: %s", lua_tostring(ss->L, -1));
                 return -err;
