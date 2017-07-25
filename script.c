@@ -254,6 +254,10 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         return NULL;
 }
 
+/**
+ * Runs the given script passed in a string. Returns 0 on success or a negative
+ * value on error.
+ */
 int script_engine_run_string(struct script_engine *se, const char *script)
 {
         int err;
