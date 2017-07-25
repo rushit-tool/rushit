@@ -299,7 +299,7 @@ DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
 int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
-        int err;
+        int err, res;
 
         h = script_engine_get_hook(ss->se, SCRIPT_HOOK_INIT);
 
@@ -312,12 +312,16 @@ int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
         /* TODO: Push globals */
 
         /* TODO: Push arguments */
-        err = lua_pcall(ss->L, 0, 0, 0);
+        err = lua_pcall(ss->L, 0, 1, 0);
         if (err) {
                 LOG_ERROR(ss->cb, "lua_pcall: %s", lua_tostring(ss->L, -1));
                 return -err;
         }
 
+        if (lua_isnil(ss->L, -1))
+                return 0;
 
-        return 0;
+        res = luaL_checkint(ss->L, -1);
+        lua_pop(ss->L, 1);
+        return res;
 }
