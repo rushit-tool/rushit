@@ -82,7 +82,7 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, bool,         debug,         false,   'd', "Set SO_DEBUG socket option");
         DEFINE_FLAG(fp, bool,         dry_run,       false,   'n', "Turn on dry-run mode");
         DEFINE_FLAG(fp, bool,         pin_cpu,       false,   'U', "Pin threads to CPU cores");
-        DEFINE_FLAG(fp, bool,         logtostderr,   false,    0,  "Log to stderr");
+        DEFINE_FLAG(fp, bool,         logtostderr,   false,   'V', "Log to stderr");
         DEFINE_FLAG(fp, bool,         nonblocking,   false,    0,  "Make sure syscalls are all nonblocking");
         DEFINE_FLAG(fp, double,       interval,      1.0,     'I', "For how many seconds that a sample is generated");
         DEFINE_FLAG(fp, long long,    max_pacing_rate, 0,     'm', "SO_MAX_PACING_RATE value; use as 32-bit unsigned");

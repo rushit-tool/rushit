@@ -77,7 +77,7 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, bool,          dry_run,         false,   'n', "Turn on dry-run mode");
         DEFINE_FLAG(fp, bool,          pin_cpu,         false,   'U', "Pin threads to CPU cores");
         DEFINE_FLAG(fp, bool,          reuseaddr,       false,   'R', "Use SO_REUSEADDR on sockets");
-        DEFINE_FLAG(fp, bool,          logtostderr,     false,    0,  "Log to stderr");
+        DEFINE_FLAG(fp, bool,          logtostderr,     false,   'V', "Log to stderr");
         DEFINE_FLAG(fp, bool,          nonblocking,     false,    0,  "Make sure syscalls are all nonblocking");
         DEFINE_FLAG(fp, bool,          enable_read,     false,   'r', "Read from flows? enabled by default for the server");
         DEFINE_FLAG(fp, bool,          enable_write,    false,   'w', "Write to flows? Enabled by default for the client");
