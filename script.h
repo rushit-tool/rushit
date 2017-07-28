@@ -35,6 +35,8 @@ struct script_engine {
         struct lua_State *L;
         struct callbacks *cb;
         struct script_hook hooks[SCRIPT_HOOK_MAX];
+        void (*wait_func)(void *);
+        void *wait_data;
 };
 
 struct script_slave {
@@ -49,8 +51,10 @@ struct script_engine *script_engine_destroy(struct script_engine *se);
 int script_slave_create(struct script_slave **ssp, struct script_engine *se);
 struct script_slave *script_slave_destroy(struct script_slave *ss);
 
-int script_engine_run_string(struct script_engine *se, const char *script);
-void script_engine_run(struct script_engine *se, void (*wait_func)(void *data), void *data);
+int script_engine_run_string(struct script_engine *se, const char *script,
+                             void (*wait_func)(void *), void *wait_data);
+int script_engine_run_file(struct script_engine *se, const char *filename,
+                           void (*wait_func)(void *), void *data);
 
 /* Callbacks for the client/server workloads */
 int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai);

@@ -243,7 +243,7 @@ static void server_wait(void *ctx_)
 void control_plane_wait_until_done(struct control_plane *cp, struct script_engine *se)
 {
         if (cp->opts->client) {
-                script_engine_run(se, client_wait, cp);
+                script_engine_run_file(se, "/dev/null", client_wait, cp);
         } else {
                 const int n = cp->opts->num_clients;
                 int* client_fds = calloc(n, sizeof(int));
@@ -269,7 +269,7 @@ void control_plane_wait_until_done(struct control_plane *cp, struct script_engin
                                 set_nonblocking(client_fds[i], cp->cb);
                 }
 
-                script_engine_run(se, server_wait, &ctx);
+                script_engine_run_file(se, "/dev/null", server_wait, &ctx);
 
                 for (i = 0; i < n; i++)
                         do_close(client_fds[i]);

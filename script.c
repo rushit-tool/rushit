@@ -254,31 +254,54 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         return NULL;
 }
 
+static int run_script(struct script_engine *se,
+                      int (*load_func)(lua_State *, const char *), const char *input,
+                      void (*wait_func)(void *data), void *wait_data)
+{
+        int err;
+
+        se->wait_func = wait_func;
+        se->wait_data = wait_data;
+
+        err = (*load_func)(se->L, input);
+        if (err) {
+                LOG_ERROR(se->cb, "luaL_load...: %s", lua_tostring(se->L, -1));
+                return -err; /* TODO: remap Lua error codes? */
+        }
+        err = lua_pcall(se->L, 0, LUA_MULTRET, 0);
+        if (err) {
+                LOG_ERROR(se->cb, "lua_pcall: %s", lua_tostring(se->L, -1));
+                return -err; /* TODO: remap Lua error codes? */
+        }
+
+
+        return 0;
+}
+
+
 /**
  * Runs the given script passed in a string. Returns 0 on success or a negative
  * value on error.
  */
-int script_engine_run_string(struct script_engine *se, const char *script)
+int script_engine_run_string(struct script_engine *se, const char *script,
+                             void (*wait_func)(void *), void *wait_data)
 {
-        int err;
-
         assert(se);
+        assert(script);
 
-        err = luaL_dostring(se->L, script);
-        if (err) {
-                LOG_ERROR(se->cb, "luaL_dostring: %s", lua_tostring(se->L, -1));
-                return -err; /* TODO: remap Lua error codes? */
-        }
-
-        return 0;
+        return run_script(se, luaL_loadstring, script, wait_func, wait_data);
 }
 
 /**
  * Run the script through the engine...
  */
-void script_engine_run(struct script_engine *se, void (*wait_func)(void *data), void *data)
+int script_engine_run_file(struct script_engine *se, const char *filename,
+                            void (*wait_func)(void *), void *wait_data)
 {
-        (*wait_func)(data);
+        assert(se);
+        assert(filename);
+
+        return run_script(se, luaL_loadfile, filename, wait_func, wait_data);
 }
 
 /**
