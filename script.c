@@ -333,9 +333,12 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
 static struct script_hook *script_engine_get_hook(struct script_engine *se,
                                                   int hook_idx)
 {
+        struct script_hook *h;
+
         assert(hook_idx == SCRIPT_HOOK_INIT);
 
-        return &se->hooks[hook_idx];
+        h = &se->hooks[hook_idx];
+        return h->bytecode ? h : NULL;
 }
 
 static struct script_hook *script_engine_put_hook(struct script_hook *hook)
