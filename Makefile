@@ -87,7 +87,7 @@ all: $(binaries)
 # Clean up just the files that are most likely to change. That is,
 # exclude the dependencies living under vendor/.
 clean:
-	rm -f *.o $(binaries) $(test-binaries)
+	rm -f *.o $(test-dir)/*.o $(binaries) $(test-binaries)
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
