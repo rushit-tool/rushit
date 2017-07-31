@@ -28,6 +28,8 @@ static void check_options(struct options *opts, struct callbacks *cb)
               "Test length must be at least 1 second.");
         CHECK(cb, opts->maxevents >= 1,
               "Number of epoll events must be positive.");
+        CHECK(cb, opts->num_flows >= 1,
+              "There must be at least 1 flow.");
         CHECK(cb, opts->num_threads >= 1,
               "There must be at least 1 thread.");
         CHECK(cb, opts->client || (opts->local_host == NULL),
@@ -53,6 +55,7 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, int,          magic,         42,       0,  "Magic number used by control connections");
         DEFINE_FLAG(fp, int,          maxevents,     1000,     0,  "Number of epoll events per epoll_wait() call");
         DEFINE_FLAG(fp, int,          num_threads,   1,       'T', "Number of threads");
+        DEFINE_FLAG(fp, int,          num_flows,     1,       'F', "Total number of flows");
         DEFINE_FLAG(fp, int,          num_clients,   1,        0,  "Number of clients");
         DEFINE_FLAG(fp, int,          test_length,   10,      'l', "Test length in seconds");
         DEFINE_FLAG(fp, int,          listen_backlog, 128,     0,  "Backlog size for listen()");

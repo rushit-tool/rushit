@@ -194,7 +194,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         if (opts->dry_run)
                 return 0;
 
-        r = script_engine_create(&se);
+        r = script_engine_create(&se, cb);
         if (r < 0)
                 LOG_FATAL(cb, "failed to create script engine: %s", strerror(-r));
 
@@ -212,7 +212,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         LOG_INFO(cb, "started worker threads");
 
         getrusage(RUSAGE_SELF, &rusage_start); // rusage start!
-        control_plane_wait_until_done(cp);
+        control_plane_wait_until_done(cp, se);
         getrusage(RUSAGE_SELF, &rusage_end); // rusage end!
 
         stop_worker_threads(cb, opts->num_threads, ts, &ready_barrier);
