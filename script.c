@@ -384,7 +384,7 @@ static void script_engine_set_hook(struct script_engine *se, int hook_idx,
         h->bytecode = Lstring_new(bytecode, bytecode_len);
 }
 
-int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
+int script_slave_run_init_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         int err, res;

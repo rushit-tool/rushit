@@ -57,6 +57,6 @@ int script_engine_run_file(struct script_engine *se, const char *filename,
                            void (*wait_func)(void *), void *data);
 
 /* Callbacks for the client/server workloads */
-int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai);
+int script_slave_run_init_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
 
 #endif

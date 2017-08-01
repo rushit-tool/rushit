@@ -160,7 +160,7 @@ static void t_run_init_hook_from_string(void **state)
         r = script_engine_run_string(ss->se, script, NULL, NULL);
         assert_return_code(r, -r);
 
-        r = script_slave_init(ss, -1, NULL);
+        r = script_slave_run_init_hook(ss, -1, NULL);
         assert_int_equal(r, 42);
 }
 
@@ -184,7 +184,7 @@ static void t_run_init_hook_from_file(void **state)
         r = script_engine_run_file(ss->se, script_path, NULL, NULL);
         assert_return_code(r, -r);
 
-        r = script_slave_init(ss, -1, NULL);
+        r = script_slave_run_init_hook(ss, -1, NULL);
         assert_int_equal(r, 42);
 
         r = unlink(script_path);
