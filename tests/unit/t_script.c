@@ -83,6 +83,7 @@ static int engine_teardown(void **state)
         struct script_engine *se = *state;
 
         se = script_engine_destroy(se);
+        assert_null(se);
 
         return 0;
 }
