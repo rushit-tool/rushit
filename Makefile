@@ -74,7 +74,7 @@ default: all
 -include $(dummy_test-objs:.o=.d)
 -include $(t_script-objs:.o=.d)
 
-.c.o:
+%.o: %.c
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
 
 %.d: %.c
