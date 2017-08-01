@@ -23,6 +23,7 @@ struct Lstring;
 
 enum {
         SCRIPT_HOOK_INIT = 0,
+        SCRIPT_HOOK_EXIT,
         SCRIPT_HOOK_MAX
 };
 
@@ -58,5 +59,6 @@ int script_engine_run_file(struct script_engine *se, const char *filename,
 
 /* Callbacks for the client/server workloads */
 int script_slave_run_init_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
+int script_slave_run_exit_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
 
 #endif

@@ -191,6 +191,19 @@ static void t_run_init_hook_from_file(void **state)
         assert_return_code(r, errno);
 }
 
+static void t_run_exit_hook(void **state)
+{
+        const char *script = "client_exit( function () return 42 end )";
+        struct script_slave *ss = *state;
+        int r;
+
+        r = script_engine_run_string(ss->se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_run_exit_hook(ss, -1, NULL);
+        assert_int_equal(r, 42);
+}
+
 #define engine_unit_test(f) cmocka_unit_test_setup_teardown((f), engine_setup, engine_teardown)
 #define slave_unit_test(f) cmocka_unit_test_setup_teardown((f), slave_setup, slave_teardown)
 
@@ -202,6 +215,7 @@ int main(void)
                 engine_unit_test(t_hooks_run_without_errors),
                 slave_unit_test(t_run_init_hook_from_string),
                 slave_unit_test(t_run_init_hook_from_file),
+                slave_unit_test(t_run_exit_hook),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);

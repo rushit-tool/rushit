@@ -77,7 +77,7 @@ static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
         return 0;
 }
 
-static int client_init_cb(lua_State *L)
+static int store_hook_bytecode(lua_State *L, int hook_idx)
 {
         struct script_engine *se;
         const char *buf;
@@ -106,7 +106,7 @@ static int client_init_cb(lua_State *L)
         if (!buf || !len)
                 LOG_FATAL(se->cb, "lua_dump returned an empty buffer");
 
-        script_engine_set_hook(se, SCRIPT_HOOK_INIT, buf, len);
+        script_engine_set_hook(se, hook_idx, buf, len);
 
         buf = NULL;
         len = 0;
@@ -118,9 +118,14 @@ static int client_init_cb(lua_State *L)
         return 0;
 }
 
+static int client_init_cb(lua_State *L)
+{
+        return store_hook_bytecode(L, SCRIPT_HOOK_INIT);
+}
+
 static int client_exit_cb(lua_State *L)
 {
-        return 0;
+        return store_hook_bytecode(L, SCRIPT_HOOK_EXIT);
 }
 
 static int client_read_cb(lua_State *L)
@@ -274,7 +279,7 @@ static int run_script(struct script_engine *se,
                 return -err; /* TODO: remap Lua error codes? */
         }
 
-
+        /* TODO: Propagate return value. */
         return 0;
 }
 
@@ -357,7 +362,7 @@ static struct script_hook *script_engine_get_hook(struct script_engine *se,
 {
         struct script_hook *h;
 
-        assert(hook_idx == SCRIPT_HOOK_INIT);
+        assert(0 <= hook_idx && hook_idx < SCRIPT_HOOK_MAX);
 
         h = &se->hooks[hook_idx];
         return h->bytecode ? h : NULL;
@@ -375,7 +380,7 @@ static void script_engine_set_hook(struct script_engine *se, int hook_idx,
         struct script_hook *h;
 
         assert(se);
-        assert(hook_idx == SCRIPT_HOOK_INIT);
+        assert(0 <= hook_idx && hook_idx < SCRIPT_HOOK_MAX);
 
         h = &se->hooks[hook_idx];
         h->name = hook_names[hook_idx];
@@ -384,12 +389,13 @@ static void script_engine_set_hook(struct script_engine *se, int hook_idx,
         h->bytecode = Lstring_new(bytecode, bytecode_len);
 }
 
-int script_slave_run_init_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai)
+static int run_hook(struct script_slave *ss, int hook_idx, int sockfd,
+                    struct addrinfo *ai)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         int err, res;
 
-        h = script_engine_get_hook(ss->se, SCRIPT_HOOK_INIT);
+        h = script_engine_get_hook(ss->se, hook_idx);
         if (!h)
                 return 0;
 
@@ -414,4 +420,16 @@ int script_slave_run_init_hook(struct script_slave *ss, int sockfd, struct addri
         res = luaL_checkint(ss->L, -1);
         lua_pop(ss->L, 1);
         return res;
+}
+
+int script_slave_run_init_hook(struct script_slave *ss, int sockfd,
+                               struct addrinfo *ai)
+{
+        return run_hook(ss, SCRIPT_HOOK_INIT, sockfd, ai);
+}
+
+int script_slave_run_exit_hook(struct script_slave *ss, int sockfd,
+                               struct addrinfo *ai)
+{
+        return run_hook(ss, SCRIPT_HOOK_EXIT, sockfd, ai);
 }
