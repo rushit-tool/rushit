@@ -68,9 +68,18 @@ binaries := tcp_rr tcp_stream dummy_test
 
 default: all
 
+-include $(base-objs:.o=.d)
+-include $(tcp_rr-objs:.o=.d)
+-include $(tcp_stream-objs:.o=.d)
+-include $(dummy_test-objs:.o=.d)
+-include $(t_script-objs:.o=.d)
+
 .c.o:
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
 
+%.d: %.c
+	@$(CC) -M $(ALL_CPPFLAGS) $< | \
+	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
 tcp_rr: $(tcp_rr-objs) $(base-deps)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
@@ -86,7 +95,7 @@ all: $(binaries)
 # Clean up just the files that are most likely to change. That is,
 # exclude the dependencies living under vendor/.
 clean:
-	rm -f *.o $(test-dir)/*.o $(binaries) $(test-binaries)
+	rm -f *.[do] $(test-dir)/*.[do] $(binaries) $(test-binaries)
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
