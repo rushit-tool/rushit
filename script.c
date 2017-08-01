@@ -280,8 +280,7 @@ static int run_script(struct script_engine *se,
 
 
 /**
- * Runs the given script passed in a string. Returns 0 on success or a negative
- * value on error.
+ * Runs the script passed in a string.
  */
 int script_engine_run_string(struct script_engine *se, const char *script,
                              void (*wait_func)(void *), void *wait_data)
@@ -293,7 +292,7 @@ int script_engine_run_string(struct script_engine *se, const char *script,
 }
 
 /**
- * Run the script through the engine...
+ * Runs the script from a given file.
  */
 int script_engine_run_file(struct script_engine *se, const char *filename,
                             void (*wait_func)(void *), void *wait_data)
