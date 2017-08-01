@@ -87,6 +87,41 @@ static int engine_teardown(void **state)
         return 0;
 }
 
+static int slave_setup(void **state)
+{
+        struct script_engine *se = NULL;
+        struct script_slave *ss = NULL;
+        int r;
+
+        r = engine_setup(state);
+        assert_return_code(r, 0);
+        se = *state;
+
+        r = script_slave_create(&ss, se);
+        assert_return_code(r, -r);
+        assert_non_null(ss);
+
+        *state = ss;
+
+        return 0;
+}
+
+static int slave_teardown(void **state)
+{
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        ss = script_slave_destroy(ss);
+        assert_null(ss);
+
+        *state = se;
+        r = engine_teardown(state);
+        assert_return_code(r, 0);
+
+        return 0;
+}
+
 static void t_hooks_run_without_errors(void **state)
 {
         struct script_engine *se = *state;
@@ -118,31 +153,21 @@ static void t_hooks_run_without_errors(void **state)
 static void t_run_init_hook_from_string(void **state)
 {
         const char *script = "client_init( function () return 42 end )";
-        struct script_engine *se = *state;
-        struct script_slave *ss = NULL;
+        struct script_slave *ss = *state;
         int r;
 
-        r = script_slave_create(&ss, se);
-        assert_return_code(r, -r);
-        assert_non_null(se);
-
-        r = script_engine_run_string(se, script, NULL, NULL);
+        r = script_engine_run_string(ss->se, script, NULL, NULL);
         assert_return_code(r, -r);
 
         r = script_slave_init(ss, -1, NULL);
         assert_int_equal(r, 42);
-
-        ss = script_slave_destroy(ss);
-        assert_null(ss);
 }
 
 static void t_run_init_hook_from_file(void **state)
 {
         const char *script = "client_init( function () return 42 end )";
         char script_path[] = "/tmp/t_run_init_hook_from_file.XXXXXX";
-
-        struct script_engine *se = *state;
-        struct script_slave *ss = NULL;
+        struct script_slave *ss = *state;
         int fd;
         ssize_t r;
 
@@ -155,24 +180,18 @@ static void t_run_init_hook_from_file(void **state)
         r = close(fd);
         assert_return_code(r, errno);
 
-        r = script_slave_create(&ss, se);
-        assert_return_code(r, -r);
-        assert_non_null(se);
-
         r = script_engine_run_file(ss->se, script_path, NULL, NULL);
         assert_return_code(r, -r);
 
         r = script_slave_init(ss, -1, NULL);
         assert_int_equal(r, 42);
 
-        ss = script_slave_destroy(ss);
-        assert_null(ss);
-
         r = unlink(script_path);
         assert_return_code(r, errno);
 }
 
 #define engine_unit_test(f) cmocka_unit_test_setup_teardown((f), engine_setup, engine_teardown)
+#define slave_unit_test(f) cmocka_unit_test_setup_teardown((f), slave_setup, slave_teardown)
 
 int main(void)
 {
@@ -180,8 +199,8 @@ int main(void)
                 cmocka_unit_test(t_create_script_engine),
                 cmocka_unit_test(t_create_script_slave),
                 engine_unit_test(t_hooks_run_without_errors),
-                engine_unit_test(t_run_init_hook_from_string),
-                engine_unit_test(t_run_init_hook_from_file),
+                slave_unit_test(t_run_init_hook_from_string),
+                slave_unit_test(t_run_init_hook_from_file),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);
