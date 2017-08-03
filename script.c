@@ -35,7 +35,11 @@
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 static const char *hook_names[SCRIPT_HOOK_MAX] = {
-        [SCRIPT_HOOK_INIT] = "init",
+        [SCRIPT_HOOK_SOCKET] = "socket_hook",
+        [SCRIPT_HOOK_CLOSE] = "close_hook",
+        [SCRIPT_HOOK_SENDMSG] = "sendmsg_hook",
+        [SCRIPT_HOOK_RECVMSG] = "recvmsg_hook",
+        [SCRIPT_HOOK_RECVERR] = "recverr_hook",
 };
 
 static void script_engine_set_hook(struct script_engine *se, int hook_idx,
