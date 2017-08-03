@@ -130,17 +130,17 @@ static int client_exit_cb(lua_State *L)
 
 static int client_sendmsg_cb(lua_State *L)
 {
-        return 0;
+        return store_hook_bytecode(L, SCRIPT_HOOK_SENDMSG);
 }
 
 static int client_recvmsg_cb(lua_State *L)
 {
-        return 0;
+        return store_hook_bytecode(L, SCRIPT_HOOK_RECVMSG);
 }
 
 static int client_recverr_cb(lua_State *L)
 {
-        return 0;
+        return store_hook_bytecode(L, SCRIPT_HOOK_RECVERR);
 }
 
 static int server_init_cb(lua_State *L)
@@ -428,6 +428,13 @@ static int run_socket_hook(struct script_slave *ss, int hook_idx,
         return run_hook(ss, hook_idx);
 }
 
+static int run_packet_hook(struct script_slave *ss, int hook_idx,
+                           int sockfd, struct msghdr *msg, int flags)
+{
+        /* TODO: Pass arguments for the hook */
+        return run_hook(ss, hook_idx);
+}
+
 int script_slave_run_init_hook(struct script_slave *ss, int sockfd,
                                struct addrinfo *ai)
 {
@@ -438,4 +445,22 @@ int script_slave_run_exit_hook(struct script_slave *ss, int sockfd,
                                struct addrinfo *ai)
 {
         return run_socket_hook(ss, SCRIPT_HOOK_EXIT, sockfd, ai);
+}
+
+ssize_t script_slave_sendmsg_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags)
+{
+        return run_packet_hook(ss, SCRIPT_HOOK_SENDMSG, sockfd, msg, flags);
+}
+
+ssize_t script_slave_recvmsg_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags)
+{
+        return run_packet_hook(ss, SCRIPT_HOOK_RECVMSG, sockfd, msg, flags);
+}
+
+ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags)
+{
+        return run_packet_hook(ss, SCRIPT_HOOK_RECVERR, sockfd, msg, flags);
 }

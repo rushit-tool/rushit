@@ -204,6 +204,45 @@ static void t_run_exit_hook(void **state)
         assert_int_equal(r, 42);
 }
 
+static void t_run_sendmsg_hook(void **state)
+{
+        const char *script = "client_sendmsg( function () return 11015 end )";
+        struct script_slave *ss = *state;
+        int r;
+
+        r = script_engine_run_string(ss->se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_sendmsg_hook(ss, -1, NULL, 0);
+        assert_int_equal(r, 11015);
+}
+
+static void t_run_recvmsg_hook(void **state)
+{
+        const char *script = "client_recvmsg( function () return 28139 end )";
+        struct script_slave *ss = *state;
+        int r;
+
+        r = script_engine_run_string(ss->se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_recvmsg_hook(ss, -1, NULL, 0);
+        assert_int_equal(r, 28139);
+}
+
+static void t_run_recverr_hook(void **state)
+{
+        const char *script = "client_recverr( function () return 7193 end )";
+        struct script_slave *ss = *state;
+        int r;
+
+        r = script_engine_run_string(ss->se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_recverr_hook(ss, -1, NULL, 0);
+        assert_int_equal(r, 7193);
+}
+
 #define engine_unit_test(f) cmocka_unit_test_setup_teardown((f), engine_setup, engine_teardown)
 #define slave_unit_test(f) cmocka_unit_test_setup_teardown((f), slave_setup, slave_teardown)
 
@@ -216,6 +255,9 @@ int main(void)
                 slave_unit_test(t_run_init_hook_from_string),
                 slave_unit_test(t_run_init_hook_from_file),
                 slave_unit_test(t_run_exit_hook),
+                slave_unit_test(t_run_sendmsg_hook),
+                slave_unit_test(t_run_recvmsg_hook),
+                slave_unit_test(t_run_recverr_hook),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);

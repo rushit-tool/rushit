@@ -17,13 +17,20 @@
 #ifndef NEPER_SCRIPT_H
 #define NEPER_SCRIPT_H
 
+#include <sys/types.h>
+
 struct addrinfo;
+struct msghdr;
+
 struct lua_State;
 struct Lstring;
 
 enum {
         SCRIPT_HOOK_INIT = 0,
         SCRIPT_HOOK_EXIT,
+        SCRIPT_HOOK_SENDMSG,
+        SCRIPT_HOOK_RECVMSG,
+        SCRIPT_HOOK_RECVERR,
         SCRIPT_HOOK_MAX
 };
 
@@ -60,5 +67,23 @@ int script_engine_run_file(struct script_engine *se, const char *filename,
 /* Callbacks for the client/server workloads */
 int script_slave_run_init_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
 int script_slave_run_exit_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
+
+/**
+ * Run send message hook (on EPOLLIN event).
+ */
+ssize_t script_slave_sendmsg_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags);
+
+/**
+ * Run receive message hook (on EPOLLOUT event).
+ */
+ssize_t script_slave_recvmsg_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags);
+
+/**
+ * Run receive error message hook (EPOLLPRI event).
+ */
+ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags);
 
 #endif
