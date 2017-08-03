@@ -167,7 +167,7 @@ static void client_connect(int i, int epfd, struct thread *t)
         int fd = -1;
 
         /* STUB: Create socket */
-        script_slave_run_init_hook(t->script_slave, fd, ai);
+        script_slave_socket_hook(t->script_slave, fd, ai);
         /* STUB: Set socket options */
         /* STUB: Connect socket */
         /* STUB: Add flow */
@@ -280,7 +280,7 @@ static void run_server(struct thread *t)
         assert(opts->maxevents > 0);
 
         /* STUB: Create data plane listening socket */
-        script_slave_run_init_hook(t->script_slave, fd_listen, t->ai);
+        script_slave_socket_hook(t->script_slave, fd_listen, t->ai);
         /* STUB: Set socket options */
         /* STUB: Bind & listen */
 

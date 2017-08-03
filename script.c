@@ -118,14 +118,14 @@ static int store_hook_bytecode(lua_State *L, int hook_idx)
         return 0;
 }
 
-static int client_init_cb(lua_State *L)
+static int client_socket_cb(lua_State *L)
 {
-        return store_hook_bytecode(L, SCRIPT_HOOK_INIT);
+        return store_hook_bytecode(L, SCRIPT_HOOK_SOCKET);
 }
 
-static int client_exit_cb(lua_State *L)
+static int client_close_cb(lua_State *L)
 {
-        return store_hook_bytecode(L, SCRIPT_HOOK_EXIT);
+        return store_hook_bytecode(L, SCRIPT_HOOK_CLOSE);
 }
 
 static int client_sendmsg_cb(lua_State *L)
@@ -143,12 +143,12 @@ static int client_recverr_cb(lua_State *L)
         return store_hook_bytecode(L, SCRIPT_HOOK_RECVERR);
 }
 
-static int server_init_cb(lua_State *L)
+static int server_socket_cb(lua_State *L)
 {
         return 0;
 }
 
-static int server_exit_cb(lua_State *L)
+static int server_close_cb(lua_State *L)
 {
         return 0;
 }
@@ -184,13 +184,13 @@ static int tid_iter_cb(lua_State *L)
 }
 
 static const struct luaL_Reg script_callbacks[] = {
-        { "client_init",  client_init_cb },
-        { "client_exit",  client_exit_cb },
+        { "client_socket",  client_socket_cb },
+        { "client_close",  client_close_cb },
         { "client_sendmsg", client_sendmsg_cb },
         { "client_recvmsg", client_recvmsg_cb },
         { "client_recverr", client_recverr_cb },
-        { "server_init",  server_init_cb },
-        { "server_exit",  server_exit_cb },
+        { "server_socket",  server_socket_cb },
+        { "server_close",  server_close_cb },
         { "server_sendmsg", server_sendmsg_cb },
         { "server_recvmsg", server_recvmsg_cb },
         { "server_recverr", server_recverr_cb },
@@ -438,16 +438,16 @@ static int run_packet_hook(struct script_slave *ss, int hook_idx,
         return run_hook(ss, hook_idx);
 }
 
-int script_slave_run_init_hook(struct script_slave *ss, int sockfd,
-                               struct addrinfo *ai)
+int script_slave_socket_hook(struct script_slave *ss, int sockfd,
+                             struct addrinfo *ai)
 {
-        return run_socket_hook(ss, SCRIPT_HOOK_INIT, sockfd, ai);
+        return run_socket_hook(ss, SCRIPT_HOOK_SOCKET, sockfd, ai);
 }
 
-int script_slave_run_exit_hook(struct script_slave *ss, int sockfd,
-                               struct addrinfo *ai)
+int script_slave_close_hook(struct script_slave *ss, int sockfd,
+                            struct addrinfo *ai)
 {
-        return run_socket_hook(ss, SCRIPT_HOOK_EXIT, sockfd, ai);
+        return run_socket_hook(ss, SCRIPT_HOOK_CLOSE, sockfd, ai);
 }
 
 ssize_t script_slave_sendmsg_hook(struct script_slave *ss, int sockfd,

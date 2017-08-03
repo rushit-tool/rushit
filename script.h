@@ -26,8 +26,8 @@ struct lua_State;
 struct Lstring;
 
 enum {
-        SCRIPT_HOOK_INIT = 0,
-        SCRIPT_HOOK_EXIT,
+        SCRIPT_HOOK_SOCKET = 0,
+        SCRIPT_HOOK_CLOSE,
         SCRIPT_HOOK_SENDMSG,
         SCRIPT_HOOK_RECVMSG,
         SCRIPT_HOOK_RECVERR,
@@ -64,9 +64,15 @@ int script_engine_run_string(struct script_engine *se, const char *script,
 int script_engine_run_file(struct script_engine *se, const char *filename,
                            void (*wait_func)(void *), void *data);
 
-/* Callbacks for the client/server workloads */
-int script_slave_run_init_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
-int script_slave_run_exit_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
+/**
+ * Run post-create socket hook.
+ */
+int script_slave_socket_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
+
+/**
+ * Run pre-close socket hook.
+ */
+int script_slave_close_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);
 
 /**
  * Run send message hook (on EPOLLIN event).

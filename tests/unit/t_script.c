@@ -128,13 +128,13 @@ static void t_hooks_run_without_errors(void **state)
 {
         struct script_engine *se = *state;
         const char *test_script[] = {
-                "client_init(function () end)",
-                "client_exit(function () end)",
+                "client_socket(function () end)",
+                "client_close(function () end)",
                 "client_sendmsg(function () end)",
                 "client_recvmsg(function () end)",
                 "client_recverr(function () end)",
-                "server_init(function () end)",
-                "server_exit(function () end)",
+                "server_socket(function () end)",
+                "server_close(function () end)",
                 "server_sendmsg(function () end)",
                 "server_recvmsg(function () end)",
                 "server_recverr(function () end)",
@@ -169,23 +169,23 @@ static void t_wait_func_gets_called(void **state)
         assert_true(wait_done);
 }
 
-static void t_run_init_hook_from_string(void **state)
+static void t_run_socket_hook_from_string(void **state)
 {
-        const char *script = "client_init( function () return 42 end )";
+        const char *script = "client_socket( function () return 42 end )";
         struct script_slave *ss = *state;
         int r;
 
         r = script_engine_run_string(ss->se, script, NULL, NULL);
         assert_return_code(r, -r);
 
-        r = script_slave_run_init_hook(ss, -1, NULL);
+        r = script_slave_socket_hook(ss, -1, NULL);
         assert_int_equal(r, 42);
 }
 
-static void t_run_init_hook_from_file(void **state)
+static void t_run_socket_hook_from_file(void **state)
 {
-        const char *script = "client_init( function () return 42 end )";
-        char script_path[] = "/tmp/t_run_init_hook_from_file.XXXXXX";
+        const char *script = "client_socket( function () return 42 end )";
+        char script_path[] = "/tmp/t_run_socket_hook_from_file.XXXXXX";
         struct script_slave *ss = *state;
         int fd;
         ssize_t r;
@@ -202,23 +202,23 @@ static void t_run_init_hook_from_file(void **state)
         r = script_engine_run_file(ss->se, script_path, NULL, NULL);
         assert_return_code(r, -r);
 
-        r = script_slave_run_init_hook(ss, -1, NULL);
+        r = script_slave_socket_hook(ss, -1, NULL);
         assert_int_equal(r, 42);
 
         r = unlink(script_path);
         assert_return_code(r, errno);
 }
 
-static void t_run_exit_hook(void **state)
+static void t_run_close_hook(void **state)
 {
-        const char *script = "client_exit( function () return 42 end )";
+        const char *script = "client_close( function () return 42 end )";
         struct script_slave *ss = *state;
         int r;
 
         r = script_engine_run_string(ss->se, script, NULL, NULL);
         assert_return_code(r, -r);
 
-        r = script_slave_run_exit_hook(ss, -1, NULL);
+        r = script_slave_close_hook(ss, -1, NULL);
         assert_int_equal(r, 42);
 }
 
@@ -271,9 +271,9 @@ int main(void)
                 cmocka_unit_test(t_create_script_slave),
                 engine_unit_test(t_hooks_run_without_errors),
                 engine_unit_test(t_wait_func_gets_called),
-                slave_unit_test(t_run_init_hook_from_string),
-                slave_unit_test(t_run_init_hook_from_file),
-                slave_unit_test(t_run_exit_hook),
+                slave_unit_test(t_run_socket_hook_from_string),
+                slave_unit_test(t_run_socket_hook_from_file),
+                slave_unit_test(t_run_close_hook),
                 slave_unit_test(t_run_sendmsg_hook),
                 slave_unit_test(t_run_recvmsg_hook),
                 slave_unit_test(t_run_recverr_hook),
