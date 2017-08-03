@@ -28,6 +28,7 @@
 
 #include <sys/epoll.h>
 #include <assert.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include "common.h"
@@ -35,6 +36,53 @@
 #include "lib.h"
 #include "logging.h"
 #include "thread.h"
+
+static struct flow fake_flow = {
+        .fd = -1,
+};
+
+static struct epoll_event fake_client_events[] = {
+        { .events = EPOLLOUT, .data = { .ptr = &fake_flow } },
+        { .events = EPOLLIN,  .data = { .ptr = &fake_flow } },
+        { .events = EPOLLPRI, .data = { .ptr = &fake_flow } },
+};
+
+static struct epoll_event fake_server_events[] = {
+        { .events = EPOLLIN,  .data = { .ptr = &fake_flow } },
+        { .events = EPOLLOUT, .data = { .ptr = &fake_flow } },
+        { .events = EPOLLPRI, .data = { .ptr = &fake_flow } },
+};
+
+static struct epoll_event *fake_events;
+static size_t n_fake_events;
+
+static void init_fake_events(bool is_client)
+{
+        if (is_client) {
+                fake_events = fake_client_events;
+                n_fake_events = ARRAY_SIZE(fake_client_events);
+        } else {
+                fake_events = fake_server_events;
+                n_fake_events = ARRAY_SIZE(fake_server_events);
+        }
+}
+
+static int fake_epoll_wait(int epfd, struct epoll_event *events,
+                           int maxevents, int timeout)
+{
+        static size_t i = 0;
+
+        assert(maxevents > 0);
+
+        /* Fake an event */
+        if (i < n_fake_events) {
+                memcpy(events, &fake_events[i], sizeof(fake_events[i]));
+                ++i;
+                return 1;
+        }
+
+        return epoll_wait(epfd, events, maxevents, timeout);
+}
 
 static void client_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, char *buf)
@@ -49,12 +97,13 @@ static void client_events(struct thread *t, int epfd,
                         break;
                 }
                 /* STUB: Delete flow on EPOLLRDHUP */
-                /* STUB: Write on EPOLLOUT */
-                /* LUA: Run client_write */
-                /* STUB: Read on EPOLLIN */
-                /* LUA: Run client_read */
-                /* STUB: Read errors on EPOLLPRI */
-                /* LUA: Run client_error */
+                if (events[i].events & EPOLLOUT) {
+                        /* LUA: Run client_sendmsg */
+                } else if (events[i].events & EPOLLIN) {
+                        /* LUA: Run client_recvmsg */
+                } else if (events[i].events & EPOLLPRI) {
+                        /* LUA: Run client_recverr */
+                }
         }
 }
 
@@ -99,7 +148,7 @@ static void run_client(struct thread *t)
         /* Main loop */
         while (!t->stop) {
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds = epoll_wait(epfd, events, opts->maxevents, ms);
+                int nfds = fake_epoll_wait(epfd, events, opts->maxevents, ms);
                 if (nfds == -1) {
                         if (errno == EINTR)
                                 continue;
@@ -129,12 +178,13 @@ static void server_events(struct thread *t, int epfd,
                 }
                 /* STUB: Accept incoming data connections */
                 /* STUB: Delete flow on EPOLLRDHUP */
-                /* STUB: Read on EPOLLIN */
-                /* LUA: Run server_read hook */
-                /* STUB: Write on EPOLLOUT */
-                /* LUA: Run server_write hook */
-                /* STUB: Read errors on EPOLLPRI? */
-                /* LUA: Run server_error hook */
+                if (events[i].events & EPOLLIN) {
+                        /* LUA: Run server_recvmsg */
+                } else if (events[i].events & EPOLLOUT) {
+                        /* LUA: Run server_sendmsg */
+                } else if (events[i].events & EPOLLPRI) {
+                        /* LUA: Run server_recverr */
+                }
         }
 }
 
@@ -170,7 +220,7 @@ static void run_server(struct thread *t)
         while (!t->stop) {
                 /* Poll for events */
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds =  epoll_wait(epfd, events, opts->maxevents, ms);
+                int nfds =  fake_epoll_wait(epfd, events, opts->maxevents, ms);
                 if (nfds == -1) {
                         if (errno == EINTR)
                                 continue;
@@ -214,5 +264,6 @@ static void report_stats(struct thread *tinfo)
 
 int dummy_test(struct options *opts, struct callbacks *cb)
 {
+        init_fake_events(opts->client);
         return run_main_thread(opts, cb, worker_thread, report_stats);
 }
