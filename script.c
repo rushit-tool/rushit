@@ -389,8 +389,7 @@ static void script_engine_set_hook(struct script_engine *se, int hook_idx,
         h->bytecode = Lstring_new(bytecode, bytecode_len);
 }
 
-static int run_hook(struct script_slave *ss, int hook_idx, int sockfd,
-                    struct addrinfo *ai)
+static int run_hook(struct script_slave *ss, int hook_idx)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         int err, res;
@@ -422,14 +421,21 @@ static int run_hook(struct script_slave *ss, int hook_idx, int sockfd,
         return res;
 }
 
+static int run_socket_hook(struct script_slave *ss, int hook_idx,
+                           int sockfd, struct addrinfo *ai)
+{
+        /* TODO: Pass arguments for the hook */
+        return run_hook(ss, hook_idx);
+}
+
 int script_slave_run_init_hook(struct script_slave *ss, int sockfd,
                                struct addrinfo *ai)
 {
-        return run_hook(ss, SCRIPT_HOOK_INIT, sockfd, ai);
+        return run_socket_hook(ss, SCRIPT_HOOK_INIT, sockfd, ai);
 }
 
 int script_slave_run_exit_hook(struct script_slave *ss, int sockfd,
                                struct addrinfo *ai)
 {
-        return run_hook(ss, SCRIPT_HOOK_EXIT, sockfd, ai);
+        return run_socket_hook(ss, SCRIPT_HOOK_EXIT, sockfd, ai);
 }
