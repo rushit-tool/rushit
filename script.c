@@ -35,7 +35,11 @@
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 static const char *hook_names[SCRIPT_HOOK_MAX] = {
-        [SCRIPT_HOOK_INIT] = "init",
+        [SCRIPT_HOOK_SOCKET] = "socket_hook",
+        [SCRIPT_HOOK_CLOSE] = "close_hook",
+        [SCRIPT_HOOK_SENDMSG] = "sendmsg_hook",
+        [SCRIPT_HOOK_RECVMSG] = "recvmsg_hook",
+        [SCRIPT_HOOK_RECVERR] = "recverr_hook",
 };
 
 static void script_engine_set_hook(struct script_engine *se, int hook_idx,
@@ -77,7 +81,7 @@ static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
         return 0;
 }
 
-static int client_init_cb(lua_State *L)
+static int store_hook_bytecode(lua_State *L, int hook_idx)
 {
         struct script_engine *se;
         const char *buf;
@@ -106,7 +110,7 @@ static int client_init_cb(lua_State *L)
         if (!buf || !len)
                 LOG_FATAL(se->cb, "lua_dump returned an empty buffer");
 
-        script_engine_set_hook(se, SCRIPT_HOOK_INIT, buf, len);
+        script_engine_set_hook(se, hook_idx, buf, len);
 
         buf = NULL;
         len = 0;
@@ -118,47 +122,52 @@ static int client_init_cb(lua_State *L)
         return 0;
 }
 
-static int client_exit_cb(lua_State *L)
+static int client_socket_cb(lua_State *L)
+{
+        return store_hook_bytecode(L, SCRIPT_HOOK_SOCKET);
+}
+
+static int client_close_cb(lua_State *L)
+{
+        return store_hook_bytecode(L, SCRIPT_HOOK_CLOSE);
+}
+
+static int client_sendmsg_cb(lua_State *L)
+{
+        return store_hook_bytecode(L, SCRIPT_HOOK_SENDMSG);
+}
+
+static int client_recvmsg_cb(lua_State *L)
+{
+        return store_hook_bytecode(L, SCRIPT_HOOK_RECVMSG);
+}
+
+static int client_recverr_cb(lua_State *L)
+{
+        return store_hook_bytecode(L, SCRIPT_HOOK_RECVERR);
+}
+
+static int server_socket_cb(lua_State *L)
 {
         return 0;
 }
 
-static int client_read_cb(lua_State *L)
+static int server_close_cb(lua_State *L)
 {
         return 0;
 }
 
-static int client_write_cb(lua_State *L)
+static int server_sendmsg_cb(lua_State *L)
 {
         return 0;
 }
 
-static int client_error_cb(lua_State *L)
+static int server_recvmsg_cb(lua_State *L)
 {
         return 0;
 }
 
-static int server_init_cb(lua_State *L)
-{
-        return 0;
-}
-
-static int server_exit_cb(lua_State *L)
-{
-        return 0;
-}
-
-static int server_read_cb(lua_State *L)
-{
-        return 0;
-}
-
-static int server_write_cb(lua_State *L)
-{
-        return 0;
-}
-
-static int server_error_cb(lua_State *L)
+static int server_recverr_cb(lua_State *L)
 {
         return 0;
 }
@@ -179,16 +188,16 @@ static int tid_iter_cb(lua_State *L)
 }
 
 static const struct luaL_Reg script_callbacks[] = {
-        { "client_init",  client_init_cb },
-        { "client_exit",  client_exit_cb },
-        { "client_read",  client_read_cb },
-        { "client_write", client_write_cb },
-        { "client_error", client_error_cb },
-        { "server_init",  server_init_cb },
-        { "server_exit",  server_exit_cb },
-        { "server_read",  server_read_cb },
-        { "server_write", server_write_cb },
-        { "server_error", server_error_cb },
+        { "client_socket",  client_socket_cb },
+        { "client_close",  client_close_cb },
+        { "client_sendmsg", client_sendmsg_cb },
+        { "client_recvmsg", client_recvmsg_cb },
+        { "client_recverr", client_recverr_cb },
+        { "server_socket",  server_socket_cb },
+        { "server_close",  server_close_cb },
+        { "server_sendmsg", server_sendmsg_cb },
+        { "server_recvmsg", server_recvmsg_cb },
+        { "server_recverr", server_recverr_cb },
         { "is_client",    is_client_cb },
         { "is_server",    is_server_cb },
         { "tid_iter",     tid_iter_cb },
@@ -254,31 +263,56 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         return NULL;
 }
 
-/**
- * Runs the given script passed in a string. Returns 0 on success or a negative
- * value on error.
- */
-int script_engine_run_string(struct script_engine *se, const char *script)
+static int run_script(struct script_engine *se,
+                      int (*load_func)(lua_State *, const char *), const char *input,
+                      void (*wait_func)(void *data), void *wait_data)
 {
         int err;
 
-        assert(se);
+        se->wait_func = wait_func;
+        se->wait_data = wait_data;
 
-        err = luaL_dostring(se->L, script);
+        err = (*load_func)(se->L, input);
         if (err) {
-                LOG_ERROR(se->cb, "luaL_dostring: %s", lua_tostring(se->L, -1));
+                LOG_ERROR(se->cb, "luaL_load...: %s", lua_tostring(se->L, -1));
+                return -err; /* TODO: remap Lua error codes? */
+        }
+        err = lua_pcall(se->L, 0, LUA_MULTRET, 0);
+        if (err) {
+                LOG_ERROR(se->cb, "lua_pcall: %s", lua_tostring(se->L, -1));
                 return -err; /* TODO: remap Lua error codes? */
         }
 
+        if (wait_func)
+                (*wait_func)(wait_data);
+
+        /* TODO: Propagate return value. */
         return 0;
 }
 
+
 /**
- * Run the script through the engine...
+ * Runs the script passed in a string.
  */
-void script_engine_run(struct script_engine *se, void (*wait_func)(void *data), void *data)
+int script_engine_run_string(struct script_engine *se, const char *script,
+                             void (*wait_func)(void *), void *wait_data)
 {
-        (*wait_func)(data);
+        assert(se);
+        assert(script);
+
+        return run_script(se, luaL_loadstring, script, wait_func, wait_data);
+}
+
+/**
+ * Runs the script from a given file.
+ */
+int script_engine_run_file(struct script_engine *se, const char *filename,
+                            void (*wait_func)(void *), void *wait_data)
+{
+        assert(se);
+        assert(filename);
+
+        return run_script(se, luaL_loadfile, filename, wait_func, wait_data);
 }
 
 /**
@@ -335,7 +369,7 @@ static struct script_hook *script_engine_get_hook(struct script_engine *se,
 {
         struct script_hook *h;
 
-        assert(hook_idx == SCRIPT_HOOK_INIT);
+        assert(0 <= hook_idx && hook_idx < SCRIPT_HOOK_MAX);
 
         h = &se->hooks[hook_idx];
         return h->bytecode ? h : NULL;
@@ -353,7 +387,7 @@ static void script_engine_set_hook(struct script_engine *se, int hook_idx,
         struct script_hook *h;
 
         assert(se);
-        assert(hook_idx == SCRIPT_HOOK_INIT);
+        assert(0 <= hook_idx && hook_idx < SCRIPT_HOOK_MAX);
 
         h = &se->hooks[hook_idx];
         h->name = hook_names[hook_idx];
@@ -362,12 +396,12 @@ static void script_engine_set_hook(struct script_engine *se, int hook_idx,
         h->bytecode = Lstring_new(bytecode, bytecode_len);
 }
 
-int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
+static int run_hook(struct script_slave *ss, int hook_idx)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         int err, res;
 
-        h = script_engine_get_hook(ss->se, SCRIPT_HOOK_INIT);
+        h = script_engine_get_hook(ss->se, hook_idx);
         if (!h)
                 return 0;
 
@@ -392,4 +426,48 @@ int script_slave_init(struct script_slave *ss, int sockfd, struct addrinfo *ai)
         res = luaL_checkint(ss->L, -1);
         lua_pop(ss->L, 1);
         return res;
+}
+
+static int run_socket_hook(struct script_slave *ss, int hook_idx,
+                           int sockfd, struct addrinfo *ai)
+{
+        /* TODO: Pass arguments for the hook */
+        return run_hook(ss, hook_idx);
+}
+
+static int run_packet_hook(struct script_slave *ss, int hook_idx,
+                           int sockfd, struct msghdr *msg, int flags)
+{
+        /* TODO: Pass arguments for the hook */
+        return run_hook(ss, hook_idx);
+}
+
+int script_slave_socket_hook(struct script_slave *ss, int sockfd,
+                             struct addrinfo *ai)
+{
+        return run_socket_hook(ss, SCRIPT_HOOK_SOCKET, sockfd, ai);
+}
+
+int script_slave_close_hook(struct script_slave *ss, int sockfd,
+                            struct addrinfo *ai)
+{
+        return run_socket_hook(ss, SCRIPT_HOOK_CLOSE, sockfd, ai);
+}
+
+ssize_t script_slave_sendmsg_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags)
+{
+        return run_packet_hook(ss, SCRIPT_HOOK_SENDMSG, sockfd, msg, flags);
+}
+
+ssize_t script_slave_recvmsg_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags)
+{
+        return run_packet_hook(ss, SCRIPT_HOOK_RECVMSG, sockfd, msg, flags);
+}
+
+ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
+                                  struct msghdr *msg, int flags)
+{
+        return run_packet_hook(ss, SCRIPT_HOOK_RECVERR, sockfd, msg, flags);
 }

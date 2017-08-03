@@ -28,6 +28,7 @@
 
 #include <sys/epoll.h>
 #include <assert.h>
+#include <stdbool.h>
 #include <stdlib.h>
 
 #include "common.h"
@@ -36,10 +37,87 @@
 #include "logging.h"
 #include "thread.h"
 
+static struct flow fake_flow = {
+        .fd = -1,
+};
+
+static struct epoll_event fake_client_events[] = {
+        { .events = EPOLLOUT, .data = { .ptr = &fake_flow } },
+        { .events = EPOLLIN,  .data = { .ptr = &fake_flow } },
+        { .events = EPOLLPRI, .data = { .ptr = &fake_flow } },
+};
+
+static struct epoll_event fake_server_events[] = {
+        { .events = EPOLLIN,  .data = { .ptr = &fake_flow } },
+        { .events = EPOLLOUT, .data = { .ptr = &fake_flow } },
+        { .events = EPOLLPRI, .data = { .ptr = &fake_flow } },
+};
+
+static struct epoll_event *fake_events;
+static size_t n_fake_events;
+
+static void init_fake_events(bool is_client)
+{
+        if (is_client) {
+                fake_events = fake_client_events;
+                n_fake_events = ARRAY_SIZE(fake_client_events);
+        } else {
+                fake_events = fake_server_events;
+                n_fake_events = ARRAY_SIZE(fake_server_events);
+        }
+}
+
+static int fake_epoll_wait(int epfd, struct epoll_event *events,
+                           int maxevents, int timeout)
+{
+        static size_t i = 0;
+
+        assert(maxevents > 0);
+
+        /* Fake an event */
+        if (i < n_fake_events) {
+                memcpy(events, &fake_events[i], sizeof(fake_events[i]));
+                ++i;
+                return 1;
+        }
+
+        return epoll_wait(epfd, events, maxevents, timeout);
+}
+
+static inline ssize_t do_write(struct thread *t, int sockfd,
+                               char *buf, size_t len, int flags)
+{
+        struct iovec iov = { .iov_base = buf, .iov_len = len };
+        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
+
+        return script_slave_sendmsg_hook(t->script_slave, sockfd, &msg, flags);
+}
+
+static inline ssize_t do_read(struct thread *t, int sockfd,
+                              char *buf, size_t len, int flags)
+{
+        struct iovec iov = { .iov_base = buf, .iov_len = len };
+        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
+
+        return script_slave_recvmsg_hook(t->script_slave, sockfd, &msg, flags);
+}
+
+static inline ssize_t do_readerr(struct thread *t, int sockfd,
+                                 char *buf, size_t len, int flags)
+{
+        struct iovec iov = { .iov_base = buf, .iov_len = len };
+        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
+
+        return script_slave_recverr_hook(t->script_slave, sockfd, &msg,
+                                         flags | MSG_ERRQUEUE);
+}
+
 static void client_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, char *buf)
 {
+        struct callbacks *cb = t->cb;
         struct flow *flow;
+        ssize_t num_bytes;
         int i;
 
         for (i = 0; i < nfds; i++) {
@@ -49,12 +127,37 @@ static void client_events(struct thread *t, int epfd,
                         break;
                 }
                 /* STUB: Delete flow on EPOLLRDHUP */
-                /* STUB: Write on EPOLLOUT */
-                /* LUA: Run client_write */
-                /* STUB: Read on EPOLLIN */
-                /* LUA: Run client_read */
-                /* STUB: Read errors on EPOLLPRI */
-                /* LUA: Run client_error */
+                if (events[i].events & EPOLLOUT) {
+                        ssize_t to_write = flow->bytes_to_write;
+                        int flags = 0;
+
+                        num_bytes = do_write(t, flow->fd, buf, to_write, flags);
+                        if (num_bytes < 0) {
+                                PLOG_ERROR(cb, "write failed with %zd",
+                                           num_bytes);
+                                continue;
+                        }
+                } else if (events[i].events & EPOLLIN) {
+                        ssize_t to_read = flow->bytes_to_read;
+                        int flags = 0;
+
+                        num_bytes = do_read(t, flow->fd, buf, to_read, flags);
+                        if (num_bytes < 0) {
+                                PLOG_ERROR(cb, "read failed with %zd",
+                                           num_bytes);
+                                continue;
+                        }
+                } else if (events[i].events & EPOLLPRI) {
+                        ssize_t to_read = 0;
+                        int flags = 0;
+
+                        num_bytes = do_readerr(t, flow->fd, buf, to_read, flags);
+                        if (num_bytes < 0) {
+                                PLOG_ERROR(cb, "read error failed with %zd",
+                                           num_bytes);
+                                continue;
+                        }
+                }
         }
 }
 
@@ -64,7 +167,7 @@ static void client_connect(int i, int epfd, struct thread *t)
         int fd = -1;
 
         /* STUB: Create socket */
-        script_slave_init(t->script_slave, fd, ai);
+        script_slave_socket_hook(t->script_slave, fd, ai);
         /* STUB: Set socket options */
         /* STUB: Connect socket */
         /* STUB: Add flow */
@@ -99,7 +202,7 @@ static void run_client(struct thread *t)
         /* Main loop */
         while (!t->stop) {
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds = epoll_wait(epfd, events, opts->maxevents, ms);
+                int nfds = fake_epoll_wait(epfd, events, opts->maxevents, ms);
                 if (nfds == -1) {
                         if (errno == EINTR)
                                 continue;
@@ -108,7 +211,9 @@ static void run_client(struct thread *t)
                 client_events(t, epfd, events, nfds, buf);
         }
 
-        /* LUA: Run client_exit hook */
+        /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
+        for (i = 0; i < flows_in_this_thread; i++)
+                script_slave_close_hook(t->script_slave, -1, t->ai);
 
         free(events);
         free(stop_fl);
@@ -119,6 +224,8 @@ static void server_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, int fd_listen,
                           char *buf)
 {
+        struct callbacks *cb = t->cb;
+        ssize_t num_bytes;
         int i;
 
         for (i = 0; i < nfds; i++) {
@@ -129,12 +236,37 @@ static void server_events(struct thread *t, int epfd,
                 }
                 /* STUB: Accept incoming data connections */
                 /* STUB: Delete flow on EPOLLRDHUP */
-                /* STUB: Read on EPOLLIN */
-                /* LUA: Run server_read hook */
-                /* STUB: Write on EPOLLOUT */
-                /* LUA: Run server_write hook */
-                /* STUB: Read errors on EPOLLPRI? */
-                /* LUA: Run server_error hook */
+                if (events[i].events & EPOLLIN) {
+                        ssize_t to_write = flow->bytes_to_write;
+                        int flags = 0;
+
+                        num_bytes = do_write(t, flow->fd, buf, to_write, flags);
+                        if (num_bytes < 0) {
+                                PLOG_ERROR(cb, "write failed with %zd",
+                                           num_bytes);
+                                continue;
+                        }
+                } else if (events[i].events & EPOLLOUT) {
+                        ssize_t to_read = flow->bytes_to_read;
+                        int flags = 0;
+
+                        num_bytes = do_read(t, flow->fd, buf, to_read, flags);
+                        if (num_bytes < 0) {
+                                PLOG_ERROR(cb, "read failed with %zd",
+                                           num_bytes);
+                                continue;
+                        }
+                } else if (events[i].events & EPOLLPRI) {
+                        ssize_t to_read = 0;
+                        int flags = 0;
+
+                        num_bytes = do_readerr(t, flow->fd, buf, to_read, flags);
+                        if (num_bytes < 0) {
+                                PLOG_ERROR(cb, "read error failed with %zd",
+                                           num_bytes);
+                                continue;
+                        }
+                }
         }
 }
 
@@ -150,7 +282,7 @@ static void run_server(struct thread *t)
         assert(opts->maxevents > 0);
 
         /* STUB: Create data plane listening socket */
-        script_slave_init(t->script_slave, fd_listen, t->ai);
+        script_slave_socket_hook(t->script_slave, fd_listen, t->ai);
         /* STUB: Set socket options */
         /* STUB: Bind & listen */
 
@@ -170,7 +302,7 @@ static void run_server(struct thread *t)
         while (!t->stop) {
                 /* Poll for events */
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds =  epoll_wait(epfd, events, opts->maxevents, ms);
+                int nfds =  fake_epoll_wait(epfd, events, opts->maxevents, ms);
                 if (nfds == -1) {
                         if (errno == EINTR)
                                 continue;
@@ -181,7 +313,7 @@ static void run_server(struct thread *t)
         }
 
         /* XXX: Sync threads? */
-        /* LUA: Run server_exit hooks */
+        script_slave_close_hook(t->script_slave, fd_listen, t->ai);
 
         /* Free resources */
         /* STUB: Free buffers */
@@ -214,5 +346,6 @@ static void report_stats(struct thread *tinfo)
 
 int dummy_test(struct options *opts, struct callbacks *cb)
 {
+        init_fake_events(opts->client);
         return run_main_thread(opts, cb, worker_thread, report_stats);
 }

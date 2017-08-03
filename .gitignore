@@ -1,5 +1,5 @@
 # Build
-*.o
+*.[do]
 /staging
 
 # Progs

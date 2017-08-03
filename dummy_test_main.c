@@ -63,7 +63,7 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, bool,         ipv6,          false,   '6', "Set desired address family to AF_INET6");
         DEFINE_FLAG(fp, bool,         client,        false,   'c', "Is client?");
         DEFINE_FLAG(fp, bool,         pin_cpu,       false,   'U', "Pin threads to CPU cores");
-        DEFINE_FLAG(fp, bool,         logtostderr,   false,    0,  "Log to stderr");
+        DEFINE_FLAG(fp, bool,         logtostderr,   false,   'V', "Log to stderr");
         DEFINE_FLAG(fp, bool,         nonblocking,   false,    0,  "Make sure syscalls are all nonblocking");
         DEFINE_FLAG(fp, const char *, local_host,    NULL,    'L', "Local hostname or IP address");
         DEFINE_FLAG(fp, const char *, host,          NULL,    'H', "Server hostname or IP address");
