@@ -211,7 +211,9 @@ static void run_client(struct thread *t)
                 client_events(t, epfd, events, nfds, buf);
         }
 
-        /* LUA: Run client_exit hook */
+        /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
+        for (i = 0; i < flows_in_this_thread; i++)
+                script_slave_close_hook(t->script_slave, -1, t->ai);
 
         free(events);
         free(stop_fl);
@@ -311,7 +313,7 @@ static void run_server(struct thread *t)
         }
 
         /* XXX: Sync threads? */
-        /* LUA: Run server_exit hooks */
+        script_slave_close_hook(t->script_slave, fd_listen, t->ai);
 
         /* Free resources */
         /* STUB: Free buffers */
