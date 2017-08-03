@@ -128,17 +128,17 @@ static int client_exit_cb(lua_State *L)
         return store_hook_bytecode(L, SCRIPT_HOOK_EXIT);
 }
 
-static int client_read_cb(lua_State *L)
+static int client_sendmsg_cb(lua_State *L)
 {
         return 0;
 }
 
-static int client_write_cb(lua_State *L)
+static int client_recvmsg_cb(lua_State *L)
 {
         return 0;
 }
 
-static int client_error_cb(lua_State *L)
+static int client_recverr_cb(lua_State *L)
 {
         return 0;
 }
@@ -153,17 +153,17 @@ static int server_exit_cb(lua_State *L)
         return 0;
 }
 
-static int server_read_cb(lua_State *L)
+static int server_sendmsg_cb(lua_State *L)
 {
         return 0;
 }
 
-static int server_write_cb(lua_State *L)
+static int server_recvmsg_cb(lua_State *L)
 {
         return 0;
 }
 
-static int server_error_cb(lua_State *L)
+static int server_recverr_cb(lua_State *L)
 {
         return 0;
 }
@@ -186,14 +186,14 @@ static int tid_iter_cb(lua_State *L)
 static const struct luaL_Reg script_callbacks[] = {
         { "client_init",  client_init_cb },
         { "client_exit",  client_exit_cb },
-        { "client_read",  client_read_cb },
-        { "client_write", client_write_cb },
-        { "client_error", client_error_cb },
+        { "client_sendmsg", client_sendmsg_cb },
+        { "client_recvmsg", client_recvmsg_cb },
+        { "client_recverr", client_recverr_cb },
         { "server_init",  server_init_cb },
         { "server_exit",  server_exit_cb },
-        { "server_read",  server_read_cb },
-        { "server_write", server_write_cb },
-        { "server_error", server_error_cb },
+        { "server_sendmsg", server_sendmsg_cb },
+        { "server_recvmsg", server_recvmsg_cb },
+        { "server_recverr", server_recverr_cb },
         { "is_client",    is_client_cb },
         { "is_server",    is_server_cb },
         { "tid_iter",     tid_iter_cb },
