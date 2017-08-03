@@ -279,6 +279,9 @@ static int run_script(struct script_engine *se,
                 return -err; /* TODO: remap Lua error codes? */
         }
 
+        if (wait_func)
+                (*wait_func)(wait_data);
+
         /* TODO: Propagate return value. */
         return 0;
 }
