@@ -210,48 +210,14 @@ void control_plane_start(struct control_plane *cp, struct addrinfo **ai)
         }
 }
 
-static void client_wait(void *cp_)
-{
-        struct control_plane *cp = cp_;
-
-        sleep(cp->opts->test_length);
-        LOG_INFO(cp->cb, "finished sleep");
-}
-
-struct server_wait_ctx {
-        struct control_plane *cp;
-        int *fds;
-        int nfds;
-};
-
-static void server_wait(void *ctx_)
-{
-        const struct server_wait_ctx *ctx = ctx_;
-        const struct control_plane *cp = ctx->cp;
-        const int *client_fds = ctx->fds;
-        const int n = ctx->nfds;
-        int i;
-
-        LOG_INFO(cp->cb, "expecting %d notifications", n);
-        for (i = 0; i < n; i++) {
-                ctrl_wait_client(client_fds[i], cp->opts->magic,
-                                 cp->cb);
-                LOG_INFO(cp->cb, "received notification %d", i);
-        }
-}
-
-void control_plane_wait_until_done(struct control_plane *cp, struct script_engine *se)
+void control_plane_wait_until_done(struct control_plane *cp)
 {
         if (cp->opts->client) {
-                script_engine_run_file(se, "/dev/null", client_wait, cp);
+                sleep(cp->opts->test_length);
+                LOG_INFO(cp->cb, "finished sleep");
         } else {
                 const int n = cp->opts->num_clients;
                 int* client_fds = calloc(n, sizeof(int));
-                struct server_wait_ctx ctx = {
-                        .cp = cp,
-                        .fds = client_fds,
-                        .nfds = n,
-                };
                 int i;
 
                 if (!client_fds)
@@ -268,9 +234,12 @@ void control_plane_wait_until_done(struct control_plane *cp, struct script_engin
                         for (i = 0; i < n; i++)
                                 set_nonblocking(client_fds[i], cp->cb);
                 }
-
-                script_engine_run_file(se, "/dev/null", server_wait, &ctx);
-
+                LOG_INFO(cp->cb, "expecting %d notifications", n);
+                for (i = 0; i < n; i++) {
+                        ctrl_wait_client(client_fds[i], cp->opts->magic,
+                                         cp->cb);
+                        LOG_INFO(cp->cb, "received notification %d", i);
+                }
                 for (i = 0; i < n; i++)
                         do_close(client_fds[i]);
                 free(client_fds);
