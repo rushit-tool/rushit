@@ -1,0 +1,11 @@
+client_socket( function () print('client_socket') end )
+client_sendmsg( function () print('client_sendmsg') end )
+client_recvmsg( function () print('client_recvmsg') end )
+client_recverr( function () print('client_recverr') end )
+client_close( function () print('client_close') end )
+
+server_socket( function () print('server_socket') end )
+server_sendmsg( function () print('server_sendmsg') end )
+server_recvmsg( function () print('server_recvmsg') end )
+server_recverr( function () print('server_recverr') end )
+server_close( function () print('server_close') end )
