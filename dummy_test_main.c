@@ -69,6 +69,7 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, const char *, host,          NULL,    'H', "Server hostname or IP address");
         DEFINE_FLAG(fp, const char *, control_port,  "12866", 'C', "Server control port");
         DEFINE_FLAG(fp, const char *, port,          "12867", 'P', "Server data port");
+        DEFINE_FLAG(fp, const char *, script,        NULL,     0,  "Lua script file to run with the workload");
         flags_parser_run(fp, argc, argv);
 
         /* Hangle unchecked options */
