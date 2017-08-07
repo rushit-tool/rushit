@@ -36,9 +36,10 @@ static void t_create_script_engine(void **state)
 {
         struct script_engine *se = NULL;
         struct callbacks *cb = *state;
+        bool is_client = false;
         int r;
 
-        r = script_engine_create(&se, cb);
+        r = script_engine_create(&se, cb, is_client);
         assert_return_code(r, -r);
         assert_non_null(se);
 
@@ -50,9 +51,10 @@ static void t_create_script_slave(void **state)
         struct script_engine *se = NULL;
         struct script_slave *ss = NULL;
         struct callbacks *cb = *state;
+        bool is_client = false;
         int r;
 
-        r = script_engine_create(&se, cb);
+        r = script_engine_create(&se, cb, is_client);
         assert_return_code(r, -r);
         assert_non_null(se);
 
@@ -68,9 +70,10 @@ static int engine_setup(void **state)
 {
         struct script_engine *se = NULL;
         struct callbacks *cb = *state;
+        bool is_client = true;
         int r;
 
-        r = script_engine_create(&se, cb);
+        r = script_engine_create(&se, cb, is_client);
         assert_return_code(r, -r);
         assert_non_null(se);
 

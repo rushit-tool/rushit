@@ -28,10 +28,11 @@
 #include "lualib.h"
 
 
+enum run_mode { CLIENT, SERVER };
+
 /*
  * Keys to Lua registry where we store hook functions and context.
  */
-
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 static const char *hook_names[SCRIPT_HOOK_MAX] = {
@@ -81,24 +82,13 @@ static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
         return 0;
 }
 
-static int store_hook_bytecode(lua_State *L, int hook_idx)
+static int store_hook_bytecode(struct script_engine *se, int hook_idx)
 {
-        struct script_engine *se;
+        lua_State *L = se->L;
         const char *buf;
         size_t len = 0;
         luaL_Buffer B;
         int err;
-
-        /* Expect a function argument */
-        luaL_checktype(L, 1, LUA_TFUNCTION);
-
-        /* Get context */
-        lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
-        lua_gettable(L, LUA_REGISTRYINDEX);
-        se = lua_touserdata(L, -1);
-        lua_pop(L, 1);
-
-        assert(se);
 
         /* Dump function bytecode */
         luaL_buffinit(L, &B);
@@ -122,29 +112,51 @@ static int store_hook_bytecode(lua_State *L, int hook_idx)
         return 0;
 }
 
+static int store_hook(lua_State *L, enum run_mode run_mode, int hook_idx)
+{
+        struct script_engine *se;
+        int rc = 0;
+
+        /* Expect a function argument */
+        luaL_checktype(L, 1, LUA_TFUNCTION);
+
+        /* Get context */
+        lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        se = lua_touserdata(L, -1);
+        lua_pop(L, 1);
+
+        assert(se);
+
+        if (se->run_mode == run_mode)
+               rc = store_hook_bytecode(se, hook_idx);
+
+        return rc;
+}
+
 static int client_socket_cb(lua_State *L)
 {
-        return store_hook_bytecode(L, SCRIPT_HOOK_SOCKET);
+        return store_hook(L, CLIENT, SCRIPT_HOOK_SOCKET);
 }
 
 static int client_close_cb(lua_State *L)
 {
-        return store_hook_bytecode(L, SCRIPT_HOOK_CLOSE);
+        return store_hook(L, CLIENT, SCRIPT_HOOK_CLOSE);
 }
 
 static int client_sendmsg_cb(lua_State *L)
 {
-        return store_hook_bytecode(L, SCRIPT_HOOK_SENDMSG);
+        return store_hook(L, CLIENT, SCRIPT_HOOK_SENDMSG);
 }
 
 static int client_recvmsg_cb(lua_State *L)
 {
-        return store_hook_bytecode(L, SCRIPT_HOOK_RECVMSG);
+        return store_hook(L, CLIENT, SCRIPT_HOOK_RECVMSG);
 }
 
 static int client_recverr_cb(lua_State *L)
 {
-        return store_hook_bytecode(L, SCRIPT_HOOK_RECVERR);
+        return store_hook(L, CLIENT, SCRIPT_HOOK_RECVERR);
 }
 
 static int server_socket_cb(lua_State *L)
@@ -208,7 +220,8 @@ static const struct luaL_Reg script_callbacks[] = {
 /**
  * Create an instance of a script engine
  */
-int script_engine_create(struct script_engine **sep, struct callbacks *cb)
+int script_engine_create(struct script_engine **sep, struct callbacks *cb,
+                         bool is_client)
 {
         CLEANUP(free) struct script_engine *se = NULL;
         const struct luaL_Reg *f;
@@ -237,6 +250,7 @@ int script_engine_create(struct script_engine **sep, struct callbacks *cb)
 
         se->L = L;
         se->cb = cb;
+        se->run_mode = is_client ? CLIENT : SERVER;
 
         *sep = se;
         se = NULL;

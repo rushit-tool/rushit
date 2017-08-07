@@ -194,7 +194,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         if (opts->dry_run)
                 return 0;
 
-        r = script_engine_create(&se, cb);
+        r = script_engine_create(&se, cb, opts->client);
         if (r < 0)
                 LOG_FATAL(cb, "failed to create script engine: %s", strerror(-r));
         if (opts->script) {
