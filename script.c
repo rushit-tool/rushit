@@ -161,27 +161,27 @@ static int client_recverr_cb(lua_State *L)
 
 static int server_socket_cb(lua_State *L)
 {
-        return 0;
+        return store_hook(L, SERVER, SCRIPT_HOOK_SOCKET);
 }
 
 static int server_close_cb(lua_State *L)
 {
-        return 0;
+        return store_hook(L, SERVER, SCRIPT_HOOK_CLOSE);
 }
 
 static int server_sendmsg_cb(lua_State *L)
 {
-        return 0;
+        return store_hook(L, SERVER, SCRIPT_HOOK_SENDMSG);
 }
 
 static int server_recvmsg_cb(lua_State *L)
 {
-        return 0;
+        return store_hook(L, SERVER, SCRIPT_HOOK_RECVMSG);
 }
 
 static int server_recverr_cb(lua_State *L)
 {
-        return 0;
+        return store_hook(L, SERVER, SCRIPT_HOOK_RECVERR);
 }
 
 static int is_client_cb(lua_State *L)
