@@ -26,7 +26,7 @@ struct msghdr;
 struct lua_State;
 struct Lstring;
 
-enum {
+enum script_hook_id {
         SCRIPT_HOOK_SOCKET = 0,
         SCRIPT_HOOK_CLOSE,
         SCRIPT_HOOK_SENDMSG,

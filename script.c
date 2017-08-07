@@ -43,7 +43,8 @@ static const char *hook_names[SCRIPT_HOOK_MAX] = {
         [SCRIPT_HOOK_RECVERR] = "recverr_hook",
 };
 
-static void script_engine_set_hook(struct script_engine *se, int hook_idx,
+static void script_engine_set_hook(struct script_engine *se,
+                                   enum script_hook_id hid,
                                    const char *bytecode, size_t length);
 
 struct Lstring {
@@ -82,7 +83,7 @@ static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
         return 0;
 }
 
-static int store_hook_bytecode(struct script_engine *se, int hook_idx)
+static int store_hook_bytecode(struct script_engine *se, enum script_hook_id hid)
 {
         lua_State *L = se->L;
         const char *buf;
@@ -100,7 +101,7 @@ static int store_hook_bytecode(struct script_engine *se, int hook_idx)
         if (!buf || !len)
                 LOG_FATAL(se->cb, "lua_dump returned an empty buffer");
 
-        script_engine_set_hook(se, hook_idx, buf, len);
+        script_engine_set_hook(se, hid, buf, len);
 
         buf = NULL;
         len = 0;
@@ -112,7 +113,8 @@ static int store_hook_bytecode(struct script_engine *se, int hook_idx)
         return 0;
 }
 
-static int store_hook(lua_State *L, enum run_mode run_mode, int hook_idx)
+static int store_hook(lua_State *L, enum run_mode run_mode,
+                      enum script_hook_id hid)
 {
         struct script_engine *se;
         int rc = 0;
@@ -129,7 +131,7 @@ static int store_hook(lua_State *L, enum run_mode run_mode, int hook_idx)
         assert(se);
 
         if (se->run_mode == run_mode)
-               rc = store_hook_bytecode(se, hook_idx);
+               rc = store_hook_bytecode(se, hid);
 
         return rc;
 }
@@ -379,13 +381,13 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
 }
 
 static struct script_hook *script_engine_get_hook(struct script_engine *se,
-                                                  int hook_idx)
+                                                  enum script_hook_id hid)
 {
         struct script_hook *h;
 
-        assert(0 <= hook_idx && hook_idx < SCRIPT_HOOK_MAX);
+        assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
 
-        h = &se->hooks[hook_idx];
+        h = &se->hooks[hid];
         return h->bytecode ? h : NULL;
 }
 
@@ -395,27 +397,28 @@ static struct script_hook *script_engine_put_hook(struct script_hook *hook)
 }
 DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
 
-static void script_engine_set_hook(struct script_engine *se, int hook_idx,
+static void script_engine_set_hook(struct script_engine *se,
+                                   enum script_hook_id hid,
                                    const char *bytecode, size_t bytecode_len)
 {
         struct script_hook *h;
 
         assert(se);
-        assert(0 <= hook_idx && hook_idx < SCRIPT_HOOK_MAX);
+        assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
 
-        h = &se->hooks[hook_idx];
-        h->name = hook_names[hook_idx];
+        h = &se->hooks[hid];
+        h->name = hook_names[hid];
         if (h->bytecode)
                 Lstring_free(h->bytecode);
         h->bytecode = Lstring_new(bytecode, bytecode_len);
 }
 
-static int run_hook(struct script_slave *ss, int hook_idx)
+static int run_hook(struct script_slave *ss, enum script_hook_id hid)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         int err, res;
 
-        h = script_engine_get_hook(ss->se, hook_idx);
+        h = script_engine_get_hook(ss->se, hid);
         if (!h)
                 return 0;
 
@@ -442,18 +445,18 @@ static int run_hook(struct script_slave *ss, int hook_idx)
         return res;
 }
 
-static int run_socket_hook(struct script_slave *ss, int hook_idx,
+static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
                            int sockfd, struct addrinfo *ai)
 {
         /* TODO: Pass arguments for the hook */
-        return run_hook(ss, hook_idx);
+        return run_hook(ss, hid);
 }
 
-static int run_packet_hook(struct script_slave *ss, int hook_idx,
+static int run_packet_hook(struct script_slave *ss, enum script_hook_id hid,
                            int sockfd, struct msghdr *msg, int flags)
 {
         /* TODO: Pass arguments for the hook */
-        return run_hook(ss, hook_idx);
+        return run_hook(ss, hid);
 }
 
 int script_slave_socket_hook(struct script_slave *ss, int sockfd,
