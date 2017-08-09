@@ -1,0 +1,5 @@
+TRACE:client_socket
+TRACE:client_sendmsg
+TRACE:client_recvmsg
+TRACE:client_recverr
+TRACE:client_close
