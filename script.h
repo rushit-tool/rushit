@@ -18,6 +18,7 @@
 #define NEPER_SCRIPT_H
 
 #include <sys/types.h>
+#include <stdbool.h>
 
 struct addrinfo;
 struct msghdr;
@@ -25,7 +26,7 @@ struct msghdr;
 struct lua_State;
 struct Lstring;
 
-enum {
+enum script_hook_id {
         SCRIPT_HOOK_SOCKET = 0,
         SCRIPT_HOOK_CLOSE,
         SCRIPT_HOOK_SENDMSG,
@@ -45,6 +46,7 @@ struct script_engine {
         struct script_hook hooks[SCRIPT_HOOK_MAX];
         void (*wait_func)(void *);
         void *wait_data;
+        int run_mode;
 };
 
 struct script_slave {
@@ -53,7 +55,8 @@ struct script_slave {
         struct callbacks *cb;
 };
 
-int script_engine_create(struct script_engine **sep, struct callbacks *cb);
+int script_engine_create(struct script_engine **sep, struct callbacks *cb,
+                         bool is_client);
 struct script_engine *script_engine_destroy(struct script_engine *se);
 
 int script_slave_create(struct script_slave **ssp, struct script_engine *se);

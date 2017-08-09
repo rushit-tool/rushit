@@ -10,6 +10,9 @@ tcp_stream
 # Tests
 t_script
 
+# Run artifacts
+*.log
+
 # Backups
 *~
 \#*#

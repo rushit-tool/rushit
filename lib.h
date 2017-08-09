@@ -79,6 +79,7 @@ struct options {
         const char *control_port;
         const char *port;
         const char *all_samples;
+        const char *script;
 
         /* tcp_stream */
         bool enable_read;

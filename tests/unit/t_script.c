@@ -36,9 +36,10 @@ static void t_create_script_engine(void **state)
 {
         struct script_engine *se = NULL;
         struct callbacks *cb = *state;
+        bool is_client = false;
         int r;
 
-        r = script_engine_create(&se, cb);
+        r = script_engine_create(&se, cb, is_client);
         assert_return_code(r, -r);
         assert_non_null(se);
 
@@ -50,9 +51,10 @@ static void t_create_script_slave(void **state)
         struct script_engine *se = NULL;
         struct script_slave *ss = NULL;
         struct callbacks *cb = *state;
+        bool is_client = false;
         int r;
 
-        r = script_engine_create(&se, cb);
+        r = script_engine_create(&se, cb, is_client);
         assert_return_code(r, -r);
         assert_non_null(se);
 
@@ -64,13 +66,14 @@ static void t_create_script_slave(void **state)
         se = script_engine_destroy(se);
 }
 
-static int engine_setup(void **state)
+static int client_engine_setup(void **state)
 {
         struct script_engine *se = NULL;
         struct callbacks *cb = *state;
+        bool is_client = true;
         int r;
 
-        r = script_engine_create(&se, cb);
+        r = script_engine_create(&se, cb, is_client);
         assert_return_code(r, -r);
         assert_non_null(se);
 
@@ -79,7 +82,7 @@ static int engine_setup(void **state)
         return 0;
 }
 
-static int engine_teardown(void **state)
+static int client_engine_teardown(void **state)
 {
         struct script_engine *se = *state;
 
@@ -89,13 +92,13 @@ static int engine_teardown(void **state)
         return 0;
 }
 
-static int slave_setup(void **state)
+static int client_slave_setup(void **state)
 {
         struct script_engine *se = NULL;
         struct script_slave *ss = NULL;
         int r;
 
-        r = engine_setup(state);
+        r = client_engine_setup(state);
         assert_return_code(r, 0);
         se = *state;
 
@@ -108,7 +111,7 @@ static int slave_setup(void **state)
         return 0;
 }
 
-static int slave_teardown(void **state)
+static int client_slave_teardown(void **state)
 {
         struct script_slave *ss = *state;
         struct script_engine *se = ss->se;
@@ -118,7 +121,7 @@ static int slave_teardown(void **state)
         assert_null(ss);
 
         *state = se;
-        r = engine_teardown(state);
+        r = client_engine_teardown(state);
         assert_return_code(r, 0);
 
         return 0;
@@ -261,22 +264,24 @@ static void t_run_recverr_hook(void **state)
         assert_int_equal(r, 7193);
 }
 
-#define engine_unit_test(f) cmocka_unit_test_setup_teardown((f), engine_setup, engine_teardown)
-#define slave_unit_test(f) cmocka_unit_test_setup_teardown((f), slave_setup, slave_teardown)
+#define clinet_engine_unit_test(f) \
+        cmocka_unit_test_setup_teardown((f), client_engine_setup, client_engine_teardown)
+#define client_slave_unit_test(f) \
+        cmocka_unit_test_setup_teardown((f), client_slave_setup, client_slave_teardown)
 
 int main(void)
 {
         const struct CMUnitTest tests[] = {
                 cmocka_unit_test(t_create_script_engine),
                 cmocka_unit_test(t_create_script_slave),
-                engine_unit_test(t_hooks_run_without_errors),
-                engine_unit_test(t_wait_func_gets_called),
-                slave_unit_test(t_run_socket_hook_from_string),
-                slave_unit_test(t_run_socket_hook_from_file),
-                slave_unit_test(t_run_close_hook),
-                slave_unit_test(t_run_sendmsg_hook),
-                slave_unit_test(t_run_recvmsg_hook),
-                slave_unit_test(t_run_recverr_hook),
+                clinet_engine_unit_test(t_hooks_run_without_errors),
+                clinet_engine_unit_test(t_wait_func_gets_called),
+                client_slave_unit_test(t_run_socket_hook_from_string),
+                client_slave_unit_test(t_run_socket_hook_from_file),
+                client_slave_unit_test(t_run_close_hook),
+                client_slave_unit_test(t_run_sendmsg_hook),
+                client_slave_unit_test(t_run_recvmsg_hook),
+                client_slave_unit_test(t_run_recverr_hook),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);
