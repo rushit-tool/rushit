@@ -4,6 +4,9 @@ BUGS:
 * logging to standard error doesn't work when the process is launched
   from a directory that is not writable (i.e. can't create a log file)
 
+TESTS:
+* Add a test runner (Avocado?)
+
 BUILD:
 * import cmocka into the source tree
 * support for out-of-source-tree builds
