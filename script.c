@@ -437,7 +437,8 @@ static int run_hook(struct script_slave *ss, enum script_hook_id hid)
 
         err = luaL_loadbuffer(ss->L, h->bytecode->data, h->bytecode->len, h->name);
         if (err) {
-                LOG_ERROR(ss->cb, "luaL_loadbuffer: %s", lua_tostring(ss->L, -1));
+                LOG_FATAL(ss->cb, "%s: luaL_loadbuffer: %s",
+                          h->name, lua_tostring(ss->L, -1));
                 return -err;
         }
         /* TODO: Push upvalues */
@@ -446,7 +447,8 @@ static int run_hook(struct script_slave *ss, enum script_hook_id hid)
         /* TODO: Push arguments */
         err = lua_pcall(ss->L, 0, 1, 0);
         if (err) {
-                LOG_ERROR(ss->cb, "lua_pcall: %s", lua_tostring(ss->L, -1));
+                LOG_FATAL(ss->cb, "%s: lua_pcall: %s",
+                          h->name, lua_tostring(ss->L, -1));
                 return -err;
         }
 
