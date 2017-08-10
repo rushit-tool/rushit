@@ -35,14 +35,6 @@ enum run_mode { CLIENT, SERVER };
  */
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
-static const char *hook_names[SCRIPT_HOOK_MAX] = {
-        [SCRIPT_HOOK_SOCKET] = "socket_hook",
-        [SCRIPT_HOOK_CLOSE] = "close_hook",
-        [SCRIPT_HOOK_SENDMSG] = "sendmsg_hook",
-        [SCRIPT_HOOK_RECVMSG] = "recvmsg_hook",
-        [SCRIPT_HOOK_RECVERR] = "recverr_hook",
-};
-
 static void script_engine_set_hook(struct script_engine *se,
                                    enum script_hook_id hid,
                                    const char *bytecode, size_t length);
@@ -201,23 +193,40 @@ static int tid_iter_cb(lua_State *L)
         return 0;
 }
 
-static const struct luaL_Reg script_callbacks[] = {
-        { "client_socket",  client_socket_cb },
-        { "client_close",  client_close_cb },
-        { "client_sendmsg", client_sendmsg_cb },
-        { "client_recvmsg", client_recvmsg_cb },
-        { "client_recverr", client_recverr_cb },
-        { "server_socket",  server_socket_cb },
-        { "server_close",  server_close_cb },
-        { "server_sendmsg", server_sendmsg_cb },
-        { "server_recvmsg", server_recvmsg_cb },
-        { "server_recverr", server_recverr_cb },
-        { "is_client",    is_client_cb },
-        { "is_server",    is_server_cb },
-        { "tid_iter",     tid_iter_cb },
+static const struct luaL_Reg client_callbacks[] = {
+        [SCRIPT_HOOK_SOCKET] =  { "client_socket",  client_socket_cb },
+        [SCRIPT_HOOK_CLOSE] =   { "client_close",   client_close_cb },
+        [SCRIPT_HOOK_SENDMSG] = { "client_sendmsg", client_sendmsg_cb },
+        [SCRIPT_HOOK_RECVMSG] = { "client_recvmsg", client_recvmsg_cb },
+        [SCRIPT_HOOK_RECVERR] = { "client_recverr", client_recverr_cb },
         { NULL, NULL },
 };
 
+static const struct luaL_Reg server_callbacks[] = {
+        [SCRIPT_HOOK_SOCKET] =  { "server_socket",  server_socket_cb },
+        [SCRIPT_HOOK_CLOSE] =   { "server_close",   server_close_cb },
+        [SCRIPT_HOOK_SENDMSG] = { "server_sendmsg", server_sendmsg_cb },
+        [SCRIPT_HOOK_RECVMSG] = { "server_recvmsg", server_recvmsg_cb },
+        [SCRIPT_HOOK_RECVERR] = { "server_recverr", server_recverr_cb },
+        { NULL, NULL },
+};
+
+static const struct luaL_Reg common_callbacks[] = {
+        { "is_client", is_client_cb },
+        { "is_server", is_server_cb },
+        { "tid_iter",  tid_iter_cb },
+        { NULL, NULL },
+};
+
+static const char *get_hook_name(enum run_mode mode, enum script_hook_id hid)
+{
+        static const struct luaL_Reg *hook_names[2] = {
+                [CLIENT] = client_callbacks,
+                [SERVER] = server_callbacks,
+        };
+
+        return hook_names[mode][hid].name;
+}
 
 /**
  * Create an instance of a script engine
@@ -242,7 +251,11 @@ int script_engine_create(struct script_engine **sep, struct callbacks *cb,
         luaL_openlibs(L);
         /* Register Lua to C callbacks (script API)
          * TODO: Switch to a single call to luaL_register()? */
-        for (f = script_callbacks; f->name; f++)
+        for (f = client_callbacks; f->name; f++)
+                lua_register(L, f->name, f->func);
+        for (f = server_callbacks; f->name; f++)
+                lua_register(L, f->name, f->func);
+        for (f = common_callbacks; f->name; f++)
                 lua_register(L, f->name, f->func);
 
         /* Set context for Lua to C callbacks */
@@ -407,7 +420,7 @@ static void script_engine_set_hook(struct script_engine *se,
         assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
 
         h = &se->hooks[hid];
-        h->name = hook_names[hid];
+        h->name = get_hook_name(se->run_mode, hid);
         if (h->bytecode)
                 Lstring_free(h->bytecode);
         h->bytecode = Lstring_new(bytecode, bytecode_len);
