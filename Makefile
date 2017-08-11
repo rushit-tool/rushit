@@ -115,6 +115,7 @@ build-luajit $(luajit-inc) $(luajit-lib) $(luajit-exe):
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
 
 clean-luajit:
+	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) uninstall
 	$(MAKE) -C $(luajit-dir) clean
 
 .PHONY: build-luajit clean-luajit
