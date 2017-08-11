@@ -110,11 +110,7 @@ superclean: clean clean-luajit
 # TODO: Move it to its own Makefile?
 #
 
-build-luajit: $(luajit-lib)
-
-$(luajit-inc): $(luajit-lib)
-
-$(luajit-lib):
+build-luajit $(luajit-inc) $(luajit-lib) $(luajit-exe):
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
 
