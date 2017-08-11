@@ -79,6 +79,7 @@ default: all
 	@$(CC) -M $(ALL_CPPFLAGS) $< | \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
+$(base-objs): $(luajit-inc)
 $(binaries) $(test-binaries): $(base-objs) $(luajit-lib)
 
 tcp_rr: $(tcp_rr-objs)
