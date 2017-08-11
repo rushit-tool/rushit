@@ -25,8 +25,10 @@ LDLIBS   =
 # Madatory flags (required for proper compilation)
 OUR_CPPFLAGS = -D_GNU_SOURCE -I$(top-dir) -I$(luajit-inc)
 OUR_CFLAGS   =
-OUR_LDFLAGS  =
+OUR_LDFLAGS  = -L$(staging-dir)/lib -Wl,-E
 OUR_LDLIBS   = -ldl -lm -lpthread -lrt
+OUR_LDLIBS  += -lluajit-5.1
+OUR_LDLIBS  += -Wl,--whole-archive -lljsyscall -Wl,--no-whole-archive
 
 # Merged flags
 ALL_CPPFLAGS = $(OUR_CPPFLAGS) $(CPPFLAGS)
@@ -41,6 +43,12 @@ staging-dir := $(top-dir)/staging
 luajit-dir := $(top-dir)/vendor/luajit.org/luajit-2.1
 luajit-inc := $(staging-dir)/include/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
+luajit-exe := $(staging-dir)/bin/luajit-2.1.0-beta3
+
+ljsyscall-dir  := $(top-dir)/vendor/github.com/justincormack/ljsyscall
+ljsyscall-srcs := $(shell find $(ljsyscall-dir)/syscall.lua $(ljsyscall-dir)/syscall -name '*.lua')
+ljsyscall-objs := $(patsubst %.lua,%.o,$(ljsyscall-srcs))
+ljsyscall-lib  := $(staging-dir)/lib/libljsyscall.a
 
 base-objs := \
 	common.o \
@@ -57,8 +65,6 @@ base-objs := \
 	script.o \
 	thread.o \
 	version.o
-base-libs := $(luajit-lib)
-base-deps := $(base-objs) $(base-libs)
 
 tcp_rr-objs := tcp_rr_main.o tcp_rr.o
 tcp_stream-objs := tcp_stream_main.o tcp_stream.o
@@ -72,7 +78,6 @@ default: all
 -include $(tcp_rr-objs:.o=.d)
 -include $(tcp_stream-objs:.o=.d)
 -include $(dummy_test-objs:.o=.d)
--include $(t_script-objs:.o=.d)
 
 %.o: %.c
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
@@ -81,25 +86,28 @@ default: all
 	@$(CC) -M $(ALL_CPPFLAGS) $< | \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
-tcp_rr: $(tcp_rr-objs) $(base-deps)
+$(base-objs): $(luajit-inc)
+$(binaries) $(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
+
+tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
-tcp_stream: $(tcp_stream-objs) $(base-deps)
+tcp_stream: $(tcp_stream-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
-dummy_test: $(dummy_test-objs) $(base-deps)
+dummy_test: $(dummy_test-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 all: $(binaries)
 
 # Clean up just the files that are most likely to change. That is,
 # exclude the dependencies living under vendor/.
-clean:
-	rm -f *.[do] $(test-dir)/*.[do] $(binaries) $(test-binaries)
+clean: clean-tests
+	rm -f *.[do] $(binaries)
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
-superclean: clean clean-luajit
+superclean: clean clean-luajit clean-ljsyscall
 	rm -rf $(staging-dir)
 
 .PHONY: all clean superclean
@@ -109,34 +117,65 @@ superclean: clean clean-luajit
 # TODO: Move it to its own Makefile?
 #
 
-build-luajit: $(luajit-lib)
-
-$(luajit-inc): $(luajit-lib)
-
-$(luajit-lib):
+build-luajit $(luajit-inc) $(luajit-lib) $(luajit-exe):
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
 
 clean-luajit:
+	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) uninstall
 	$(MAKE) -C $(luajit-dir) clean
 
 .PHONY: build-luajit clean-luajit
 
 #
+# ljsyscall
+#
+
+$(ljsyscall-objs): $(luajit-exe)
+
+$(ljsyscall-dir)/%.o: $(ljsyscall-dir)/%.lua
+	$(luajit-exe) -b -t o -n $(subst /,.,$(subst $(ljsyscall-dir)/,,$(basename $<))) $< $@
+
+build-ljsyscall $(ljsyscall-lib): $(ljsyscall-objs)
+	$(AR) cr $@ $^
+
+clean-ljsyscall:
+	$(RM) $(ljsyscall-lib) $(ljsyscall-objs)
+
+.PHONY: build-ljsyscall clean-ljsyscall
+
+#
 # Tests
 #
 
-test-dir := $(top-dir)/tests/unit
+test-dir       := $(top-dir)/tests
+func-test-dir  := $(test-dir)/func
+unit-test-dir  := $(test-dir)/unit
+unit-test-libs := $(shell pkg-config --libs cmocka)
 
-test-libs := $(shell pkg-config --libs cmocka)
+t_script-objs := $(unit-test-dir)/t_script.o
+test-binaries := $(unit-test-dir)/t_script
 
-test-binaries := t_script
+-include $(t_script-objs:.o=.d)
 
-t_script-objs := $(test-dir)/t_script.o
+$(unit-test-dir)/t_script: $(t_script-objs)
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $^ $(ALL_LDFLAGS) $(ALL_LDLIBS) $(unit-test-libs)
 
-t_script: $(t_script-objs) $(base-deps)
-	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS) $(test-libs)
+$(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
-tests: $(test-binaries)
+build-tests: $(test-binaries)
 
-.PHONY: tests
+clean-tests:
+	$(RM) -f $(unit-test-dir)/*.[do] $(test-binaries)
+
+check-unit: $(test-binaries)
+	$(unit-test-dir)/t_script
+
+check-func: dummy_test
+	$(func-test-dir)/0001
+	$(func-test-dir)/0002
+	$(func-test-dir)/0003
+
+check: check-unit check-func
+
+.PHONY: build-tests clean-tests check-unit check-func check

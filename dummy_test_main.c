@@ -57,7 +57,7 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, int,          num_threads,   1,       'T', "Number of threads");
         DEFINE_FLAG(fp, int,          num_flows,     1,       'F', "Total number of flows");
         DEFINE_FLAG(fp, int,          num_clients,   1,        0,  "Number of clients");
-        DEFINE_FLAG(fp, int,          test_length,   10,      'l', "Test length in seconds");
+        DEFINE_FLAG(fp, int,          test_length,   1,       'l', "Test length in seconds");
         DEFINE_FLAG(fp, int,          listen_backlog, 128,     0,  "Backlog size for listen()");
         DEFINE_FLAG(fp, bool,         ipv4,          false,   '4', "Set desired address family to AF_INET");
         DEFINE_FLAG(fp, bool,         ipv6,          false,   '6', "Set desired address family to AF_INET6");

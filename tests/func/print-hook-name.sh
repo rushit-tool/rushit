@@ -10,7 +10,7 @@ client_out=$(mktemp)
 ./dummy_test --script $script | grep '^TRACE:'> $server_out &
 server_pid=$!
 
-./dummy_test --script $script --client --test-length 1 | grep '^TRACE:' > $client_out &
+./dummy_test --script $script --client | grep '^TRACE:' > $client_out &
 client_pid=$!
 
 wait $client_pid

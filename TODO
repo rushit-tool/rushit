@@ -8,6 +8,7 @@ TESTS:
 * Add a test runner (Avocado?)
 
 BUILD:
+* fix parallel builds (make -jN)
 * import cmocka into the source tree
 * support for out-of-source-tree builds
 
