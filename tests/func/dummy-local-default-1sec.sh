@@ -2,10 +2,10 @@
 
 set -o errexit
 
-./dummy_test --logtostderr &
+./dummy_test > /dev/null &
 server_pid=$!
 
-./dummy_test --logtostderr --test-length 1 --client &
+./dummy_test --client > /dev/null &
 client_pid=$!
 
 wait $client_pid
