@@ -57,8 +57,6 @@ base-objs := \
 	script.o \
 	thread.o \
 	version.o
-base-libs := $(luajit-lib)
-base-deps := $(base-objs) $(base-libs)
 
 tcp_rr-objs := tcp_rr_main.o tcp_rr.o
 tcp_stream-objs := tcp_stream_main.o tcp_stream.o
@@ -81,13 +79,15 @@ default: all
 	@$(CC) -M $(ALL_CPPFLAGS) $< | \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
-tcp_rr: $(tcp_rr-objs) $(base-deps)
+$(binaries) $(test-binaries): $(base-objs) $(luajit-lib)
+
+tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
-tcp_stream: $(tcp_stream-objs) $(base-deps)
+tcp_stream: $(tcp_stream-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
-dummy_test: $(dummy_test-objs) $(base-deps)
+dummy_test: $(dummy_test-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 all: $(binaries)
@@ -134,7 +134,7 @@ test-binaries := t_script
 
 t_script-objs := $(test-dir)/t_script.o
 
-t_script: $(t_script-objs) $(base-deps)
+t_script: $(t_script-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS) $(test-libs)
 
 tests: $(test-binaries)
