@@ -78,7 +78,6 @@ default: all
 -include $(tcp_rr-objs:.o=.d)
 -include $(tcp_stream-objs:.o=.d)
 -include $(dummy_test-objs:.o=.d)
--include $(t_script-objs:.o=.d)
 
 %.o: %.c
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
@@ -103,8 +102,8 @@ all: $(binaries)
 
 # Clean up just the files that are most likely to change. That is,
 # exclude the dependencies living under vendor/.
-clean:
-	rm -f *.[do] $(test-dir)/*.[do] $(binaries) $(test-binaries)
+clean: clean-tests
+	rm -f *.[do] $(binaries)
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
@@ -149,17 +148,34 @@ clean-ljsyscall:
 # Tests
 #
 
-test-dir := $(top-dir)/tests/unit
+test-dir       := $(top-dir)/tests
+func-test-dir  := $(test-dir)/func
+unit-test-dir  := $(test-dir)/unit
+unit-test-libs := $(shell pkg-config --libs cmocka)
 
-test-libs := $(shell pkg-config --libs cmocka)
+t_script-objs := $(unit-test-dir)/t_script.o
+test-binaries := $(unit-test-dir)/t_script
 
-test-binaries := t_script
+-include $(t_script-objs:.o=.d)
 
-t_script-objs := $(test-dir)/t_script.o
+$(unit-test-dir)/t_script: $(t_script-objs)
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $^ $(ALL_LDFLAGS) $(ALL_LDLIBS) $(unit-test-libs)
 
-t_script: $(t_script-objs)
-	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS) $(test-libs)
+$(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
-tests: $(test-binaries)
+build-tests: $(test-binaries)
 
-.PHONY: tests
+clean-tests:
+	$(RM) -f $(unit-test-dir)/*.[do] $(test-binaries)
+
+check-unit: $(test-binaries)
+	$(unit-test-dir)/t_script
+
+check-func: dummy_test
+	$(func-test-dir)/0001
+	$(func-test-dir)/0002
+	$(func-test-dir)/0003
+
+check: check-unit check-func
+
+.PHONY: build-tests clean-tests check-unit check-func check
