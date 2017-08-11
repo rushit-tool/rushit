@@ -25,8 +25,10 @@ LDLIBS   =
 # Madatory flags (required for proper compilation)
 OUR_CPPFLAGS = -D_GNU_SOURCE -I$(top-dir) -I$(luajit-inc)
 OUR_CFLAGS   =
-OUR_LDFLAGS  =
+OUR_LDFLAGS  = -L$(staging-dir)/lib -Wl,-E
 OUR_LDLIBS   = -ldl -lm -lpthread -lrt
+OUR_LDLIBS  += -lluajit-5.1
+OUR_LDLIBS  += -Wl,--whole-archive -lljsyscall -Wl,--no-whole-archive
 
 # Merged flags
 ALL_CPPFLAGS = $(OUR_CPPFLAGS) $(CPPFLAGS)
@@ -41,6 +43,12 @@ staging-dir := $(top-dir)/staging
 luajit-dir := $(top-dir)/vendor/luajit.org/luajit-2.1
 luajit-inc := $(staging-dir)/include/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
+luajit-exe := $(staging-dir)/bin/luajit-2.1.0-beta3
+
+ljsyscall-dir  := $(top-dir)/vendor/github.com/justincormack/ljsyscall
+ljsyscall-srcs := $(shell find $(ljsyscall-dir)/syscall.lua $(ljsyscall-dir)/syscall -name '*.lua')
+ljsyscall-objs := $(patsubst %.lua,%.o,$(ljsyscall-srcs))
+ljsyscall-lib  := $(staging-dir)/lib/libljsyscall.a
 
 base-objs := \
 	common.o \
@@ -80,7 +88,7 @@ default: all
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
 $(base-objs): $(luajit-inc)
-$(binaries) $(test-binaries): $(base-objs) $(luajit-lib)
+$(binaries) $(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
 tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
@@ -100,7 +108,7 @@ clean:
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
-superclean: clean clean-luajit
+superclean: clean clean-luajit clean-ljsyscall
 	rm -rf $(staging-dir)
 
 .PHONY: all clean superclean
@@ -119,6 +127,23 @@ clean-luajit:
 	$(MAKE) -C $(luajit-dir) clean
 
 .PHONY: build-luajit clean-luajit
+
+#
+# ljsyscall
+#
+
+$(ljsyscall-objs): $(luajit-exe)
+
+$(ljsyscall-dir)/%.o: $(ljsyscall-dir)/%.lua
+	$(luajit-exe) -b -t o -n $(subst /,.,$(subst $(ljsyscall-dir)/,,$(basename $<))) $< $@
+
+build-ljsyscall $(ljsyscall-lib): $(ljsyscall-objs)
+	$(AR) cr $@ $^
+
+clean-ljsyscall:
+	$(RM) $(ljsyscall-lib) $(ljsyscall-objs)
+
+.PHONY: build-ljsyscall clean-ljsyscall
 
 #
 # Tests
