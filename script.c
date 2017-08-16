@@ -426,14 +426,19 @@ static void script_engine_set_hook(struct script_engine *se,
         h->bytecode = Lstring_new(bytecode, bytecode_len);
 }
 
-static int run_hook(struct script_slave *ss, enum script_hook_id hid)
+enum {
+        HOOK_EMPTY = 0,
+        HOOK_LOADED,
+};
+
+static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
-        int err, res;
+        int err;
 
         h = script_engine_get_hook(ss->se, hid);
         if (!h)
-                return 0;
+                return HOOK_EMPTY;
 
         err = luaL_loadbuffer(ss->L, h->bytecode->data, h->bytecode->len, h->name);
         if (err) {
@@ -444,11 +449,18 @@ static int run_hook(struct script_slave *ss, enum script_hook_id hid)
         /* TODO: Push upvalues */
         /* TODO: Push globals */
 
-        /* TODO: Push arguments */
+        return HOOK_LOADED;
+}
+
+static int call_hook(struct script_slave *ss, enum script_hook_id hid)
+{
+        int err, res;
+
         err = lua_pcall(ss->L, 0, 1, 0);
         if (err) {
                 LOG_FATAL(ss->cb, "%s: lua_pcall: %s",
-                          h->name, lua_tostring(ss->L, -1));
+                          get_hook_name(ss->se->run_mode, hid),
+                          lua_tostring(ss->L, -1));
                 return -err;
         }
 
@@ -458,6 +470,18 @@ static int run_hook(struct script_slave *ss, enum script_hook_id hid)
         res = luaL_checkint(ss->L, -1);
         lua_pop(ss->L, 1);
         return res;
+}
+
+static int run_hook(struct script_slave *ss, enum script_hook_id hid)
+{
+        int r;
+
+        r = push_hook(ss, hid);
+        if (r < 0 || r == HOOK_EMPTY)
+                return r;
+
+        /* TODO: Push arguments */
+        return call_hook(ss, hid);
 }
 
 static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
