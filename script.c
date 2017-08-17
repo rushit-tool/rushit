@@ -493,7 +493,8 @@ static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs
         return res;
 }
 
-static int run_hook(struct script_slave *ss, enum script_hook_id hid)
+static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
+                           int sockfd, struct addrinfo *ai)
 {
         int r;
 
@@ -505,18 +506,17 @@ static int run_hook(struct script_slave *ss, enum script_hook_id hid)
         return call_hook(ss, hid, 0);
 }
 
-static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
-                           int sockfd, struct addrinfo *ai)
-{
-        /* TODO: Pass arguments for the hook */
-        return run_hook(ss, hid);
-}
-
 static int run_packet_hook(struct script_slave *ss, enum script_hook_id hid,
                            int sockfd, struct msghdr *msg, int flags)
 {
-        /* TODO: Pass arguments for the hook */
-        return run_hook(ss, hid);
+        int r;
+
+        r = push_hook(ss, hid);
+        if (r < 0 || r == HOOK_EMPTY)
+                return r;
+
+        /* TODO: Push arguments */
+        return call_hook(ss, hid, 0);
 }
 
 int script_slave_socket_hook(struct script_slave *ss, int sockfd,
