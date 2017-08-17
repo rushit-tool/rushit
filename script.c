@@ -473,11 +473,11 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
         return HOOK_LOADED;
 }
 
-static int call_hook(struct script_slave *ss, enum script_hook_id hid)
+static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs)
 {
         int err, res;
 
-        err = lua_pcall(ss->L, 0, 1, 0);
+        err = lua_pcall(ss->L, nargs, 1, 0);
         if (err) {
                 LOG_FATAL(ss->cb, "%s: lua_pcall: %s",
                           get_hook_name(ss->se->run_mode, hid),
@@ -502,7 +502,7 @@ static int run_hook(struct script_slave *ss, enum script_hook_id hid)
                 return r;
 
         /* TODO: Push arguments */
-        return call_hook(ss, hid);
+        return call_hook(ss, hid, 0);
 }
 
 static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
