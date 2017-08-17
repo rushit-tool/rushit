@@ -83,6 +83,10 @@ struct flags_parser* flags_parser_create(struct options *opts,
                          &fp->help);
         flags_parser_add(fp, 'v', "version", "Show version and exit", "bool",
                          &fp->version);
+
+        /* Common flags */
+        DEFINE_FLAG(fp, const char *, script, NULL, 0, "Lua script file to run with the workload");
+
         return fp;
 }
 
