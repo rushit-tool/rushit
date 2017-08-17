@@ -447,6 +447,54 @@ static void script_engine_set_hook(struct script_engine *se,
         h->bytecode = Lstring_new(bytecode, bytecode_len);
 }
 
+/**
+ * Equivalent of:
+ *
+ * function (proto, ptr)
+ *   return ffi.cast(ffi.typeof(proto), ptr)
+ * end
+ *
+ * TODO: Move to script_prelude.lua?
+ */
+static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, void *ptr)
+{
+        int err;
+
+        /* Get ffi */
+        lua_getglobal(L, "require");
+        lua_pushliteral(L, "ffi");
+        err = lua_pcall(L, 1, 1, 0);
+        if (err) {
+                LOG_ERROR(cb, "lua_pcall(require 'ffi'): %s", lua_tostring(L, -1));
+                return -err;
+        }
+
+        lua_getfield(L, -1, "cast");
+        lua_getfield(L, -2, "typeof");
+
+        /* Call ffi.typeof */
+        lua_pushstring(L, proto);
+        err = lua_pcall(L, 1, 1, 0);
+        if (err) {
+                lua_pop(L, 3);
+                LOG_ERROR(cb, "lua_pcall(ffi.typeof): %s", lua_tostring(L, -1));
+                return -err;
+        }
+
+        /* Call ffi.cast*/
+        lua_pushlightuserdata(L, ptr);
+        err = lua_pcall(L, 2, 1, 0);
+        if (err) {
+                lua_pop(L, 2);
+                LOG_ERROR(cb, "lua_pcall(ffi.cast): %s", lua_tostring(L, -1));
+                return -err;
+        }
+
+        /* Remove ffi module */
+        lua_remove(L, -2);
+        return  0;
+}
+
 enum {
         HOOK_EMPTY = 0,
         HOOK_LOADED,
@@ -502,8 +550,11 @@ static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
         if (r < 0 || r == HOOK_EMPTY)
                 return r;
 
-        /* TODO: Push arguments */
-        return call_hook(ss, hid, 0);
+        /* Push arguments */
+        lua_pushinteger(ss->L, sockfd);
+        push_cpointer(ss->cb, ss->L, "struct addrinfo *", ai);
+
+        return call_hook(ss, hid, 2);
 }
 
 static int run_packet_hook(struct script_slave *ss, enum script_hook_id hid,
