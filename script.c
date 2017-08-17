@@ -39,6 +39,8 @@ static void script_engine_set_hook(struct script_engine *se,
                                    enum script_hook_id hid,
                                    const char *bytecode, size_t length);
 
+DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
+
 struct Lstring {
         char *data;
         size_t len;
@@ -344,13 +346,30 @@ int script_engine_run_file(struct script_engine *se, const char *filename,
         return run_script(se, luaL_loadfile, filename, wait_func, wait_data);
 }
 
+static int load_prelude(struct callbacks *cb, lua_State *L)
+{
+        int err;
+
+        lua_getglobal(L, "require");
+        lua_pushliteral(L, "script_prelude");
+        err = lua_pcall(L, 1, 0, 0);
+        if (err) {
+                LOG_ERROR(cb, "require('script_prelude'): %s",
+                          lua_tostring(L, -1));
+                return -err;
+        }
+
+        return 0;
+}
+
 /**
  * Create an instance of a slave script engine
  */
 int script_slave_create(struct script_slave **ssp, struct script_engine *se)
 {
         CLEANUP(free) struct script_slave *ss = NULL;
-        lua_State *L;
+        CLEANUP(lua_close) lua_State *L = NULL;
+        int err;
 
         assert(ssp);
         assert(se);
@@ -363,14 +382,16 @@ int script_slave_create(struct script_slave **ssp, struct script_engine *se)
         if (!L)
                 return -ENOMEM;
         luaL_openlibs(L);
-
-        /* TODO: Load prelude */
+        err = load_prelude(se->cb, L);
+        if (err)
+                return err;
 
         /* TODO: Install hooks */
 
         ss->se = se;
         ss->cb = se->cb;
         ss->L = L;
+        L = NULL;
 
         *ssp = ss;
         ss = NULL;

@@ -63,6 +63,7 @@ base-objs := \
 	percentiles.o \
 	sample.o \
 	script.o \
+	script_prelude.o \
 	thread.o \
 	version.o
 
@@ -81,6 +82,9 @@ default: all
 
 %.o: %.c
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
+
+%.o: %.lua
+	$(luajit-exe) -b -t o -n $(basename $<) $< $@
 
 %.d: %.c
 	@$(CC) -M $(ALL_CPPFLAGS) $< | \
