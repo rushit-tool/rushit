@@ -28,6 +28,8 @@ SOCK_STREAM = C.SOCK.STREAM
 IPPROTO_TCP = C.IPPROTO.TCP
 -- ...
 
+MSG_PEEK = C.MSG.PEEK
+-- ...
 
 --
 -- Types

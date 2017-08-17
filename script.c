@@ -566,8 +566,12 @@ static int run_packet_hook(struct script_slave *ss, enum script_hook_id hid,
         if (r < 0 || r == HOOK_EMPTY)
                 return r;
 
-        /* TODO: Push arguments */
-        return call_hook(ss, hid, 0);
+        /* Push arguments */
+        lua_pushinteger(ss->L, sockfd);
+        push_cpointer(ss->cb, ss->L, "struct msghdr *", msg);
+        lua_pushinteger(ss->L, flags);
+
+        return call_hook(ss, hid, 3);
 }
 
 int script_slave_socket_hook(struct script_slave *ss, int sockfd,

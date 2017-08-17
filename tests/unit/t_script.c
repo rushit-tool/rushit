@@ -7,6 +7,7 @@
 #include <cmocka.h>
 #include <unistd.h>
 
+#include "common.h"
 #include "lib.h"
 #include "logging.h"
 #include "script.h"
@@ -265,8 +266,10 @@ static void t_run_recverr_hook(void **state)
         assert_int_equal(r, 7193);
 }
 
-#define lua_assert_equal(expr, val) \
-        "assert(" #expr " == " #val ", 'expected " #expr " to be " #val ", got ' .. tostring(" #expr "));"
+#define lua_assert(expr, op, val) \
+        "assert(" #expr #op #val ", 'expected " #expr " to be " #val ", got ' .. tostring(" #expr "));"
+#define lua_assert_equal(expr, val) lua_assert(expr, ==, val)
+#define lua_assert_not_equal(expr, val) lua_assert(expr, ~=, val)
 
 static void t_pass_args_to_socket_hook(void **state)
 {
@@ -311,6 +314,53 @@ static void t_pass_args_to_socket_hook(void **state)
         assert_int_equal(r, 0);
 }
 
+static void t_pass_args_to_packet_hook(void **state)
+{
+        int fd = 1234;
+        int flags = MSG_PEEK;
+        struct sockaddr_in sin = {
+                .sin_family = AF_INET,
+                .sin_port = htons(1234),
+                .sin_addr = { htonl(0x01020304) },
+        };
+        char buf[] = "Hello";
+        struct iovec iov = {
+                .iov_base = buf,
+                .iov_len = ARRAY_SIZE(buf),
+        };
+        struct msghdr msg = {
+                .msg_name = &sin,
+                .msg_namelen = sizeof(sin),
+                .msg_iov = &iov,
+                .msg_iovlen = 1,
+                .msg_control = NULL,
+                .msg_controllen = 0,
+                .msg_flags = 0,
+        };
+        const char *script =
+                "client_recvmsg("
+                "  function (fd, msg, flags)"
+                "    " lua_assert_equal(fd, 1234)
+                "    " lua_assert_not_equal(msg.msg_iov, nil)
+                "    " lua_assert_equal(msg.msg_iovlen, 1)
+                "    " /* TODO: Assert more values in msg */
+                /* "    print('msg_name', msg.msg_name);" */
+                /* "    print('msg_namelen', msg.msg_namelen);" */
+                "    " lua_assert_equal(flags, MSG_PEEK)
+                "    return 0;"
+                "  end"
+                ")";
+
+        struct script_slave *ss = *state;
+        int r;
+
+        r = script_engine_run_string(ss->se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_recvmsg_hook(ss, fd, &msg, flags);
+        assert_int_equal(r, 0);
+}
+
 #define clinet_engine_unit_test(f) \
         cmocka_unit_test_setup_teardown((f), client_engine_setup, client_engine_teardown)
 #define client_slave_unit_test(f) \
@@ -330,6 +380,7 @@ int main(void)
                 client_slave_unit_test(t_run_recvmsg_hook),
                 client_slave_unit_test(t_run_recverr_hook),
                 client_slave_unit_test(t_pass_args_to_socket_hook),
+                client_slave_unit_test(t_pass_args_to_packet_hook),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);
