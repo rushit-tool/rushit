@@ -145,6 +145,7 @@ static void client_connect(int flow_id, int epfd, struct thread *t)
         fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (fd == -1)
                 PLOG_FATAL(cb, "socket");
+        script_slave_socket_hook(t->script_slave, fd, ai);
         if (opts->min_rto)
                 set_min_rto(fd, opts->min_rto, cb);
         if (opts->debug)
@@ -196,6 +197,11 @@ static void run_client(struct thread *t)
                 }
                 process_events(t, epfd, events, nfds, -1, buf);
         }
+
+        /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
+        for (i = 0; i < flows_in_this_thread; i++)
+                script_slave_close_hook(t->script_slave, -1, t->ai);
+
         free(buf);
         free(events);
         free(stop_fl);
