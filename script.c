@@ -66,6 +66,13 @@ static void Lstring_free(struct Lstring *s)
         free(s);
 }
 
+static enum script_hook_error errno_lua(int err)
+{
+        assert(err == LUA_ERRRUN || err == LUA_ERRSYNTAX ||
+               err == LUA_ERRMEM || err == LUA_ERRERR);
+        return SCRIPT_HOOK_ERROR_BASE + err;
+}
+
 /*
  * Lua to C callbacks
  */
@@ -306,12 +313,12 @@ static int run_script(struct script_engine *se,
         err = (*load_func)(se->L, input);
         if (err) {
                 LOG_ERROR(se->cb, "luaL_load...: %s", lua_tostring(se->L, -1));
-                return -err; /* TODO: remap Lua error codes? */
+                return -errno_lua(err);
         }
         err = lua_pcall(se->L, 0, LUA_MULTRET, 0);
         if (err) {
                 LOG_ERROR(se->cb, "lua_pcall: %s", lua_tostring(se->L, -1));
-                return -err; /* TODO: remap Lua error codes? */
+                return -errno_lua(err);
         }
 
         if (wait_func)
@@ -356,7 +363,7 @@ static int load_prelude(struct callbacks *cb, lua_State *L)
         if (err) {
                 LOG_ERROR(cb, "require('script_prelude'): %s",
                           lua_tostring(L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         return 0;
@@ -466,7 +473,7 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         err = lua_pcall(L, 1, 1, 0);
         if (err) {
                 LOG_ERROR(cb, "lua_pcall(require 'ffi'): %s", lua_tostring(L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         lua_getfield(L, -1, "cast");
@@ -478,7 +485,7 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         if (err) {
                 lua_pop(L, 3);
                 LOG_ERROR(cb, "lua_pcall(ffi.typeof): %s", lua_tostring(L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         /* Call ffi.cast*/
@@ -487,7 +494,7 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         if (err) {
                 lua_pop(L, 2);
                 LOG_ERROR(cb, "lua_pcall(ffi.cast): %s", lua_tostring(L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         /* Remove ffi module */
@@ -513,7 +520,7 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
         if (err) {
                 LOG_FATAL(ss->cb, "%s: luaL_loadbuffer: %s",
                           h->name, lua_tostring(ss->L, -1));
-                return -err;
+                return -errno_lua(err);
         }
         /* TODO: Push upvalues */
         /* TODO: Push globals */
@@ -530,7 +537,7 @@ static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs
                 LOG_FATAL(ss->cb, "%s: lua_pcall: %s",
                           get_hook_name(ss->se->run_mode, hid),
                           lua_tostring(ss->L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         if (lua_isnil(ss->L, -1))
