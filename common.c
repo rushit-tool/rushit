@@ -21,6 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "common.h"
+#include "script.h"
 
 struct rate_conversion {
         const char *prefix;
@@ -353,4 +354,12 @@ int create_suicide_timeout(int sec_to_suicide)
                 return -1;
         }
         return 0;
+}
+
+const char *strerror_extended(int errnum)
+{
+        if (errnum < SCRIPT_HOOK_ERROR_BASE)
+                return strerror(errnum);
+        else
+                return script_strerror(errnum);
 }

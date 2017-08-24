@@ -98,4 +98,6 @@ void parse_max_pacing_rate(char *arg, void *out, struct callbacks *cb);
 
 int create_suicide_timeout(int sec_to_suicide);
 
+const char *strerror_extended(int errnum);
+
 #endif

@@ -113,4 +113,6 @@ ssize_t script_slave_recvmsg_hook(struct script_slave *ss, int sockfd,
 ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
                                   struct msghdr *msg, int flags);
 
+const char *script_strerror(int errnum);
+
 #endif

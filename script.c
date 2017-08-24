@@ -605,3 +605,23 @@ ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
 {
         return run_packet_hook(ss, SCRIPT_HOOK_RECVERR, sockfd, msg, flags);
 }
+
+const char *script_strerror(int errnum)
+{
+        switch (errnum) {
+        case EHOOKEMPTY:
+                return "No hook to invoke";
+        case EHOOKRETVAL:
+                return "No return value from hook";
+        case EHOOKRUN:
+                return "Hook runtime error";
+        case EHOOKSYNTAX:
+                return "Hook syntax error";
+        case EHOOKMEM:
+                return "Hook memory allocation error";
+        case EHOOKERR:
+                return "Hook error handler error";
+        default:
+                return "Unkown script error";
+        };
+}
