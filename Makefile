@@ -180,6 +180,7 @@ check-func: dummy_test tcp_stream
 	$(func-test-dir)/0002
 	$(func-test-dir)/0003
 	$(func-test-dir)/0004
+	$(func-test-dir)/0005
 
 check: check-unit check-func
 
