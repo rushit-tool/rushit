@@ -21,6 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "common.h"
+#include "script.h"
 
 struct rate_conversion {
         const char *prefix;
@@ -227,6 +228,55 @@ int do_connect(int s, const struct sockaddr *addr, socklen_t addr_len)
         }
 }
 
+ssize_t do_write(struct script_slave *ss, int sockfd, char *buf, size_t len,
+                 int flags)
+{
+        struct iovec iov = { .iov_base = buf, .iov_len = len };
+        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
+        ssize_t n;
+
+        n = script_slave_sendmsg_hook(ss, sockfd, &msg, flags);
+        if (n == -EHOOKEMPTY)
+                n = write(sockfd, buf, len);
+        else if (n < 0)
+                errno = -n;
+
+        return n < 0 ? -1 : n;
+}
+
+ssize_t do_read(struct script_slave *ss, int sockfd, char *buf, size_t len,
+                int flags)
+{
+        struct iovec iov = { .iov_base = buf, .iov_len = len };
+        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
+        ssize_t n;
+
+        n = script_slave_recvmsg_hook(ss, sockfd, &msg, flags);
+        if (n == -EHOOKEMPTY)
+                n = read(sockfd, buf, len);
+        else if (n < 0)
+                errno = -n;
+
+        return n < 0 ? -1 : n;
+}
+
+ssize_t do_readerr(struct script_slave *ss, int sockfd, char *buf, size_t len,
+                   int flags)
+{
+        struct iovec iov = { .iov_base = buf, .iov_len = len };
+        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
+        ssize_t n;
+
+        flags |= MSG_ERRQUEUE;
+        n = script_slave_recverr_hook(ss, sockfd, &msg, flags);
+        if (n == -EHOOKEMPTY)
+                n = recv(sockfd, buf, len, flags);
+        else if (n < 0)
+                errno = -n;
+
+        return n < 0 ? -1 : n;
+}
+
 struct addrinfo *copy_addrinfo(struct addrinfo *in)
 {
         struct addrinfo *out = calloc(1, sizeof(*in) + in->ai_addrlen);
@@ -353,4 +403,12 @@ int create_suicide_timeout(int sec_to_suicide)
                 return -1;
         }
         return 0;
+}
+
+const char *strerror_extended(int errnum)
+{
+        if (errnum < SCRIPT_HOOK_ERROR_BASE)
+                return strerror(errnum);
+        else
+                return script_strerror(errnum);
 }

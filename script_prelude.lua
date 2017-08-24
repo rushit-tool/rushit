@@ -31,9 +31,22 @@ IPPROTO_TCP = C.IPPROTO.TCP
 MSG_PEEK = C.MSG.PEEK
 -- ...
 
+SOL_SOCKET = C.SOL.SOCKET
+-- ...
+
+SO_TYPE = C.SO.TYPE
+-- ...
+
 --
 -- Types
 --
 local T = S.t
 
 sockaddr_in = T.sockaddr_in
+
+--
+-- Functions
+--
+getsockopt = S.getsockopt
+recvmsg = S.recvmsg
+sendmsg = S.sendmsg

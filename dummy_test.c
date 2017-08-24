@@ -84,34 +84,6 @@ static int fake_epoll_wait(int epfd, struct epoll_event *events,
         return epoll_wait(epfd, events, maxevents, timeout);
 }
 
-static inline ssize_t do_write(struct thread *t, int sockfd,
-                               char *buf, size_t len, int flags)
-{
-        struct iovec iov = { .iov_base = buf, .iov_len = len };
-        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
-
-        return script_slave_sendmsg_hook(t->script_slave, sockfd, &msg, flags);
-}
-
-static inline ssize_t do_read(struct thread *t, int sockfd,
-                              char *buf, size_t len, int flags)
-{
-        struct iovec iov = { .iov_base = buf, .iov_len = len };
-        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
-
-        return script_slave_recvmsg_hook(t->script_slave, sockfd, &msg, flags);
-}
-
-static inline ssize_t do_readerr(struct thread *t, int sockfd,
-                                 char *buf, size_t len, int flags)
-{
-        struct iovec iov = { .iov_base = buf, .iov_len = len };
-        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
-
-        return script_slave_recverr_hook(t->script_slave, sockfd, &msg,
-                                         flags | MSG_ERRQUEUE);
-}
-
 static void client_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, char *buf)
 {
@@ -131,7 +103,8 @@ static void client_events(struct thread *t, int epfd,
                         ssize_t to_write = flow->bytes_to_write;
                         int flags = 0;
 
-                        num_bytes = do_write(t, flow->fd, buf, to_write, flags);
+                        num_bytes = do_write(t->script_slave, flow->fd, buf,
+                                             to_write, flags);
                         if (num_bytes < 0) {
                                 PLOG_ERROR(cb, "write failed with %zd",
                                            num_bytes);
@@ -141,7 +114,8 @@ static void client_events(struct thread *t, int epfd,
                         ssize_t to_read = flow->bytes_to_read;
                         int flags = 0;
 
-                        num_bytes = do_read(t, flow->fd, buf, to_read, flags);
+                        num_bytes = do_read(t->script_slave, flow->fd, buf,
+                                            to_read, flags);
                         if (num_bytes < 0) {
                                 PLOG_ERROR(cb, "read failed with %zd",
                                            num_bytes);
@@ -151,7 +125,8 @@ static void client_events(struct thread *t, int epfd,
                         ssize_t to_read = 0;
                         int flags = 0;
 
-                        num_bytes = do_readerr(t, flow->fd, buf, to_read, flags);
+                        num_bytes = do_readerr(t->script_slave, flow->fd, buf,
+                                               to_read, flags);
                         if (num_bytes < 0) {
                                 PLOG_ERROR(cb, "read error failed with %zd",
                                            num_bytes);
@@ -240,7 +215,8 @@ static void server_events(struct thread *t, int epfd,
                         ssize_t to_write = flow->bytes_to_write;
                         int flags = 0;
 
-                        num_bytes = do_write(t, flow->fd, buf, to_write, flags);
+                        num_bytes = do_write(t->script_slave, flow->fd, buf,
+                                             to_write, flags);
                         if (num_bytes < 0) {
                                 PLOG_ERROR(cb, "write failed with %zd",
                                            num_bytes);
@@ -250,7 +226,8 @@ static void server_events(struct thread *t, int epfd,
                         ssize_t to_read = flow->bytes_to_read;
                         int flags = 0;
 
-                        num_bytes = do_read(t, flow->fd, buf, to_read, flags);
+                        num_bytes = do_read(t->script_slave, flow->fd, buf,
+                                            to_read, flags);
                         if (num_bytes < 0) {
                                 PLOG_ERROR(cb, "read failed with %zd",
                                            num_bytes);
@@ -260,7 +237,8 @@ static void server_events(struct thread *t, int epfd,
                         ssize_t to_read = 0;
                         int flags = 0;
 
-                        num_bytes = do_readerr(t, flow->fd, buf, to_read, flags);
+                        num_bytes = do_readerr(t->script_slave, flow->fd, buf,
+                                               to_read, flags);
                         if (num_bytes < 0) {
                                 PLOG_ERROR(cb, "read error failed with %zd",
                                            num_bytes);

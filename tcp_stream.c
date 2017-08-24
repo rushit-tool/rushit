@@ -77,10 +77,12 @@ static void process_events(struct thread *t, int epfd,
                            struct epoll_event *events, int nfds, int fd_listen,
                            char *buf)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         struct timespec ts;
         ssize_t num_bytes;
+        int flags = 0;
         int i;
 
         for (i = 0; i < nfds; i++) {
@@ -99,7 +101,8 @@ static void process_events(struct thread *t, int epfd,
                 }
                 if (opts->enable_read && (events[i].events & EPOLLIN)) {
 read_again:
-                        num_bytes = read(flow->fd, buf, opts->buffer_size);
+                        num_bytes = do_read(ss, flow->fd, buf,
+                                            opts->buffer_size, flags);
                         if (num_bytes == -1) {
                                 if (errno != EAGAIN)
                                         PLOG_ERROR(cb, "read");
@@ -117,7 +120,8 @@ read_again:
                 }
                 if (opts->enable_write && (events[i].events & EPOLLOUT)) {
 write_again:
-                        num_bytes = write(flow->fd, buf, opts->buffer_size);
+                        num_bytes = do_write(ss, flow->fd, buf,
+                                             opts->buffer_size, flags);
                         if (num_bytes == -1) {
                                 if (errno != EAGAIN)
                                         PLOG_ERROR(cb, "write");
@@ -145,6 +149,7 @@ static void client_connect(int flow_id, int epfd, struct thread *t)
         fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (fd == -1)
                 PLOG_FATAL(cb, "socket");
+        script_slave_socket_hook(t->script_slave, fd, ai);
         if (opts->min_rto)
                 set_min_rto(fd, opts->min_rto, cb);
         if (opts->debug)
@@ -196,6 +201,11 @@ static void run_client(struct thread *t)
                 }
                 process_events(t, epfd, events, nfds, -1, buf);
         }
+
+        /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
+        for (i = 0; i < flows_in_this_thread; i++)
+                script_slave_close_hook(t->script_slave, -1, t->ai);
+
         free(buf);
         free(events);
         free(stop_fl);
@@ -216,6 +226,7 @@ static void run_server(struct thread *t)
         fd_listen = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (fd_listen == -1)
                 PLOG_FATAL(cb, "socket");
+        script_slave_socket_hook(t->script_slave, fd_listen, ai);
         set_reuseport(fd_listen, cb);
         set_reuseaddr(fd_listen, 1, cb);
         if (bind(fd_listen, ai->ai_addr, ai->ai_addrlen))
@@ -246,6 +257,9 @@ static void run_server(struct thread *t)
                 }
                 process_events(t, epfd, events, nfds, fd_listen, buf);
         }
+
+        script_slave_close_hook(t->script_slave, fd_listen, t->ai);
+
         free(buf);
         free(events);
         free(stop_fl);

@@ -22,6 +22,8 @@
 
 struct callbacks;
 
+const char *strerror_extended(int errnum);
+
 void logging_init(struct callbacks *);
 void logging_exit(struct callbacks *);
 
@@ -36,9 +38,9 @@ void logging_exit(struct callbacks *);
 #define LOG_INFO(cb, fmt, args...) \
         (cb)->log_info((cb)->logger, __FILE__, __LINE__, __func__, fmt, ##args)
 #define PLOG_FATAL(cb, fmt, args...) \
-        LOG_FATAL(cb, fmt ": %s", ##args, strerror(errno))
+        LOG_FATAL(cb, fmt ": %s", ##args, strerror_extended(errno))
 #define PLOG_ERROR(cb, fmt, args...) \
-        LOG_ERROR(cb, fmt ": %s", ##args, strerror(errno))
+        LOG_ERROR(cb, fmt ": %s", ##args, strerror_extended(errno))
 #define CHECK(cb, cond, fmt, args...) \
         if (!(cond)) \
                 LOG_FATAL(cb, fmt, ##args)

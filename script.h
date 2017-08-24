@@ -26,6 +26,24 @@ struct msghdr;
 struct lua_State;
 struct Lstring;
 
+/* Stay out of errno range */
+#define SCRIPT_HOOK_ERROR_BASE (1 << 8)
+
+enum script_hook_error {
+        /* no hook to invoke */
+        EHOOKEMPTY = SCRIPT_HOOK_ERROR_BASE,
+        /* hook didn't return a value */
+        EHOOKRETVAL,
+        /* hook runtime error (LUA_ERRRUN) */
+        EHOOKRUN,
+        /* syntax error during hook pre-compilation (LUA_ERRSYNTAX) */
+        EHOOKSYNTAX,
+        /* hook memory allocation error (LUA_ERRMEM) */
+        EHOOKMEM,
+        /* error while running the hook error handler function (LUA_ERRERR) */
+        EHOOKERR,
+};
+
 enum script_hook_id {
         SCRIPT_HOOK_SOCKET = 0,
         SCRIPT_HOOK_CLOSE,
@@ -94,5 +112,7 @@ ssize_t script_slave_recvmsg_hook(struct script_slave *ss, int sockfd,
  */
 ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
                                   struct msghdr *msg, int flags);
+
+const char *script_strerror(int errnum);
 
 #endif

@@ -66,6 +66,13 @@ static void Lstring_free(struct Lstring *s)
         free(s);
 }
 
+static enum script_hook_error errno_lua(int err)
+{
+        assert(err == LUA_ERRRUN || err == LUA_ERRSYNTAX ||
+               err == LUA_ERRMEM || err == LUA_ERRERR);
+        return SCRIPT_HOOK_ERROR_BASE + err;
+}
+
 /*
  * Lua to C callbacks
  */
@@ -306,12 +313,12 @@ static int run_script(struct script_engine *se,
         err = (*load_func)(se->L, input);
         if (err) {
                 LOG_ERROR(se->cb, "luaL_load...: %s", lua_tostring(se->L, -1));
-                return -err; /* TODO: remap Lua error codes? */
+                return -errno_lua(err);
         }
         err = lua_pcall(se->L, 0, LUA_MULTRET, 0);
         if (err) {
                 LOG_ERROR(se->cb, "lua_pcall: %s", lua_tostring(se->L, -1));
-                return -err; /* TODO: remap Lua error codes? */
+                return -errno_lua(err);
         }
 
         if (wait_func)
@@ -356,7 +363,7 @@ static int load_prelude(struct callbacks *cb, lua_State *L)
         if (err) {
                 LOG_ERROR(cb, "require('script_prelude'): %s",
                           lua_tostring(L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         return 0;
@@ -466,7 +473,7 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         err = lua_pcall(L, 1, 1, 0);
         if (err) {
                 LOG_ERROR(cb, "lua_pcall(require 'ffi'): %s", lua_tostring(L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         lua_getfield(L, -1, "cast");
@@ -478,7 +485,7 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         if (err) {
                 lua_pop(L, 3);
                 LOG_ERROR(cb, "lua_pcall(ffi.typeof): %s", lua_tostring(L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         /* Call ffi.cast*/
@@ -487,18 +494,13 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         if (err) {
                 lua_pop(L, 2);
                 LOG_ERROR(cb, "lua_pcall(ffi.cast): %s", lua_tostring(L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         /* Remove ffi module */
         lua_remove(L, -2);
         return  0;
 }
-
-enum {
-        HOOK_EMPTY = 0,
-        HOOK_LOADED,
-};
 
 static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 {
@@ -507,18 +509,18 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 
         h = script_engine_get_hook(ss->se, hid);
         if (!h)
-                return HOOK_EMPTY;
+                return -EHOOKEMPTY;
 
         err = luaL_loadbuffer(ss->L, h->bytecode->data, h->bytecode->len, h->name);
         if (err) {
                 LOG_FATAL(ss->cb, "%s: luaL_loadbuffer: %s",
                           h->name, lua_tostring(ss->L, -1));
-                return -err;
+                return -errno_lua(err);
         }
         /* TODO: Push upvalues */
         /* TODO: Push globals */
 
-        return HOOK_LOADED;
+        return 0;
 }
 
 static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs)
@@ -530,11 +532,11 @@ static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs
                 LOG_FATAL(ss->cb, "%s: lua_pcall: %s",
                           get_hook_name(ss->se->run_mode, hid),
                           lua_tostring(ss->L, -1));
-                return -err;
+                return -errno_lua(err);
         }
 
         if (lua_isnil(ss->L, -1))
-                return 0;
+                return -EHOOKRETVAL;
 
         res = luaL_checkint(ss->L, -1);
         lua_pop(ss->L, 1);
@@ -544,11 +546,11 @@ static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs
 static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
                            int sockfd, struct addrinfo *ai)
 {
-        int r;
+        int err;
 
-        r = push_hook(ss, hid);
-        if (r < 0 || r == HOOK_EMPTY)
-                return r;
+        err = push_hook(ss, hid);
+        if (err)
+                return err;
 
         /* Push arguments */
         lua_pushinteger(ss->L, sockfd);
@@ -560,11 +562,11 @@ static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
 static int run_packet_hook(struct script_slave *ss, enum script_hook_id hid,
                            int sockfd, struct msghdr *msg, int flags)
 {
-        int r;
+        int err;
 
-        r = push_hook(ss, hid);
-        if (r < 0 || r == HOOK_EMPTY)
-                return r;
+        err = push_hook(ss, hid);
+        if (err)
+                return err;
 
         /* Push arguments */
         lua_pushinteger(ss->L, sockfd);
@@ -602,4 +604,24 @@ ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
                                   struct msghdr *msg, int flags)
 {
         return run_packet_hook(ss, SCRIPT_HOOK_RECVERR, sockfd, msg, flags);
+}
+
+const char *script_strerror(int errnum)
+{
+        switch (errnum) {
+        case EHOOKEMPTY:
+                return "No hook to invoke";
+        case EHOOKRETVAL:
+                return "No return value from hook";
+        case EHOOKRUN:
+                return "Hook runtime error";
+        case EHOOKSYNTAX:
+                return "Hook syntax error";
+        case EHOOKMEM:
+                return "Hook memory allocation error";
+        case EHOOKERR:
+                return "Hook error handler error";
+        default:
+                return "Unkown script error";
+        };
 }
