@@ -502,11 +502,6 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         return  0;
 }
 
-enum {
-        HOOK_EMPTY = 0,
-        HOOK_LOADED,
-};
-
 static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
@@ -514,7 +509,7 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 
         h = script_engine_get_hook(ss->se, hid);
         if (!h)
-                return HOOK_EMPTY;
+                return -EHOOKEMPTY;
 
         err = luaL_loadbuffer(ss->L, h->bytecode->data, h->bytecode->len, h->name);
         if (err) {
@@ -525,7 +520,7 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
         /* TODO: Push upvalues */
         /* TODO: Push globals */
 
-        return HOOK_LOADED;
+        return 0;
 }
 
 static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs)
@@ -541,7 +536,7 @@ static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs
         }
 
         if (lua_isnil(ss->L, -1))
-                return 0;
+                return -EHOOKRETVAL;
 
         res = luaL_checkint(ss->L, -1);
         lua_pop(ss->L, 1);
@@ -551,11 +546,11 @@ static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs
 static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
                            int sockfd, struct addrinfo *ai)
 {
-        int r;
+        int err;
 
-        r = push_hook(ss, hid);
-        if (r < 0 || r == HOOK_EMPTY)
-                return r;
+        err = push_hook(ss, hid);
+        if (err)
+                return err;
 
         /* Push arguments */
         lua_pushinteger(ss->L, sockfd);
@@ -567,11 +562,11 @@ static int run_socket_hook(struct script_slave *ss, enum script_hook_id hid,
 static int run_packet_hook(struct script_slave *ss, enum script_hook_id hid,
                            int sockfd, struct msghdr *msg, int flags)
 {
-        int r;
+        int err;
 
-        r = push_hook(ss, hid);
-        if (r < 0 || r == HOOK_EMPTY)
-                return r;
+        err = push_hook(ss, hid);
+        if (err)
+                return err;
 
         /* Push arguments */
         lua_pushinteger(ss->L, sockfd);
