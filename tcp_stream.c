@@ -222,6 +222,7 @@ static void run_server(struct thread *t)
         fd_listen = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (fd_listen == -1)
                 PLOG_FATAL(cb, "socket");
+        script_slave_socket_hook(t->script_slave, fd_listen, ai);
         set_reuseport(fd_listen, cb);
         set_reuseaddr(fd_listen, 1, cb);
         if (bind(fd_listen, ai->ai_addr, ai->ai_addrlen))
@@ -252,6 +253,9 @@ static void run_server(struct thread *t)
                 }
                 process_events(t, epfd, events, nfds, fd_listen, buf);
         }
+
+        script_slave_close_hook(t->script_slave, fd_listen, t->ai);
+
         free(buf);
         free(events);
         free(stop_fl);
