@@ -241,7 +241,7 @@ ssize_t do_write(struct script_slave *ss, int sockfd, char *buf, size_t len,
         else if (n < 0)
                 errno = -n;
 
-        return n;
+        return n < 0 ? -1 : n;
 }
 
 ssize_t do_read(struct script_slave *ss, int sockfd, char *buf, size_t len,
@@ -257,7 +257,7 @@ ssize_t do_read(struct script_slave *ss, int sockfd, char *buf, size_t len,
         else if (n < 0)
                 errno = -n;
 
-        return n;
+        return n < 0 ? -1 : n;
 }
 
 ssize_t do_readerr(struct script_slave *ss, int sockfd, char *buf, size_t len,
@@ -274,7 +274,7 @@ ssize_t do_readerr(struct script_slave *ss, int sockfd, char *buf, size_t len,
         else if (n < 0)
                 errno = -n;
 
-        return n;
+        return n < 0 ? -1 : n;
 }
 
 struct addrinfo *copy_addrinfo(struct addrinfo *in)
