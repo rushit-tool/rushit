@@ -84,55 +84,6 @@ static int fake_epoll_wait(int epfd, struct epoll_event *events,
         return epoll_wait(epfd, events, maxevents, timeout);
 }
 
-static inline ssize_t do_write(struct script_slave *ss, int sockfd,
-                               char *buf, size_t len, int flags)
-{
-        struct iovec iov = { .iov_base = buf, .iov_len = len };
-        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
-        ssize_t n;
-
-        n = script_slave_sendmsg_hook(ss, sockfd, &msg, flags);
-        if (n == -EHOOKEMPTY)
-                n = write(sockfd, buf, len);
-        else if (n < 0)
-                errno = -n;
-
-        return n;
-}
-
-static inline ssize_t do_read(struct script_slave *ss, int sockfd,
-                              char *buf, size_t len, int flags)
-{
-        struct iovec iov = { .iov_base = buf, .iov_len = len };
-        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
-        ssize_t n;
-
-        n = script_slave_recvmsg_hook(ss, sockfd, &msg, flags);
-        if (n == -EHOOKEMPTY)
-                n = read(sockfd, buf, len);
-        else if (n < 0)
-                errno = -n;
-
-        return n;
-}
-
-static inline ssize_t do_readerr(struct script_slave *ss, int sockfd,
-                                 char *buf, size_t len, int flags)
-{
-        struct iovec iov = { .iov_base = buf, .iov_len = len };
-        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
-        ssize_t n;
-
-        flags |= MSG_ERRQUEUE;
-        n = script_slave_recverr_hook(ss, sockfd, &msg, flags);
-        if (n == -EHOOKEMPTY)
-                n = recv(sockfd, buf, len, flags);
-        else if (n < 0)
-                errno = -n;
-
-        return n;
-}
-
 static void client_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, char *buf)
 {

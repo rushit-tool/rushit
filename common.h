@@ -35,6 +35,8 @@
 #define ARRAY_SIZE(a) (sizeof((a))/sizeof((a)[0]))
 #define UNUSED(x) ((void) (x))
 
+struct script_slave;
+
 static inline void free_cleanup(void *p) { free(*(void **) p); }
 #define CLEANUP(f) __attribute__((cleanup(f##_cleanup)))
 #define DEFINE_CLEANUP_FUNC(func, type)                 \
@@ -89,6 +91,12 @@ int procfile_int(const char *path, struct callbacks *cb);
 void fill_random(char *buf, int size);
 int do_close(int fd);
 int do_connect(int s, const struct sockaddr *addr, socklen_t addr_len);
+ssize_t do_write(struct script_slave *ss, int sockfd, char *buf, size_t len,
+                 int flags);
+ssize_t do_read(struct script_slave *ss, int sockfd, char *buf, size_t len,
+                int flags);
+ssize_t do_readerr(struct script_slave *ss, int sockfd, char *buf, size_t len,
+                   int flags);
 struct addrinfo *copy_addrinfo(struct addrinfo *in);
 void reset_port(struct addrinfo *ai, int port, struct callbacks *cb);
 int try_connect(const char *host, const char *port, struct addrinfo **ai,
