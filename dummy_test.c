@@ -138,11 +138,14 @@ static void client_events(struct thread *t, int epfd,
 
 static void client_connect(int i, int epfd, struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
+        struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
-        int fd = -1;
+        int fd;
 
-        /* STUB: Create socket */
-        script_slave_socket_hook(t->script_slave, fd, ai);
+        fd = do_socket_open(ss, ai);
+        if (fd == -1)
+                PLOG_FATAL(cb, "socket");
         /* STUB: Set socket options */
         /* STUB: Connect socket */
         /* STUB: Add flow */
@@ -150,11 +153,13 @@ static void client_connect(int i, int epfd, struct thread *t)
 
 static void run_client(struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         const int flows_in_this_thread = flows_in_thread(opts->num_flows,
                                                          opts->num_threads,
                                                          t->index);
         struct callbacks *cb = t->cb;
+        struct addrinfo *ai = t->ai;
         struct epoll_event *events;
         struct flow *stop_fl;
         char *buf = NULL;
@@ -187,8 +192,11 @@ static void run_client(struct thread *t)
         }
 
         /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
-        for (i = 0; i < flows_in_this_thread; i++)
-                script_slave_close_hook(t->script_slave, -1, t->ai);
+        for (i = 0; i < flows_in_this_thread; i++) {
+                if (do_socket_close(ss, -1, ai) < 0)
+                        /* PLOG_FATAL(cb, "close"); */
+                        /* XXX: ignore errors */ ;
+        }
 
         free(events);
         free(stop_fl);
@@ -250,8 +258,10 @@ static void server_events(struct thread *t, int epfd,
 
 static void run_server(struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
+        struct addrinfo *ai = t->ai;
         struct epoll_event *events;
         struct flow *stop_fl;
         int fd_listen = -1, epfd;
@@ -259,8 +269,9 @@ static void run_server(struct thread *t)
 
         assert(opts->maxevents > 0);
 
-        /* STUB: Create data plane listening socket */
-        script_slave_socket_hook(t->script_slave, fd_listen, t->ai);
+        fd_listen = do_socket_open(ss, ai);
+        if (fd_listen == -1)
+                PLOG_FATAL(cb, "socket");
         /* STUB: Set socket options */
         /* STUB: Bind & listen */
 
@@ -291,7 +302,8 @@ static void run_server(struct thread *t)
         }
 
         /* XXX: Sync threads? */
-        script_slave_close_hook(t->script_slave, fd_listen, t->ai);
+        if (do_socket_close(ss, fd_listen, ai) < 0)
+                PLOG_FATAL(cb, "close");
 
         /* Free resources */
         /* STUB: Free buffers */

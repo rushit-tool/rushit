@@ -51,6 +51,7 @@ static inline void track_finish_time(struct flow *flow)
 static void client_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, char *buf)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         struct flow *flow;
@@ -76,7 +77,7 @@ static void client_events(struct thread *t, int epfd,
                                 flags |= MSG_MORE;
                         }
                         track_write_time(opts, flow);
-                        num_bytes = send(flow->fd, buf, to_write, flags);
+                        num_bytes = do_write(ss, flow->fd, buf, to_write, flags);
                         if (num_bytes == -1) {
                                 PLOG_ERROR(cb, "write");
                                 continue;
@@ -94,7 +95,7 @@ static void client_events(struct thread *t, int epfd,
 
                         if (to_read > opts->buffer_size)
                                 to_read = opts->buffer_size;
-                        num_bytes = read(flow->fd, buf, to_read);
+                        num_bytes = do_read(ss, flow->fd, buf, to_read, 0);
                         if (num_bytes == -1) {
                                 PLOG_ERROR(cb, "read");
                                 continue;
@@ -133,13 +134,14 @@ static void *buf_alloc(struct options *opts)
 
 static void client_connect(int i, int epfd, struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
         struct flow *flow;
         int fd;
 
-        fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        fd = do_socket_open(ss, ai);
         if (fd == -1)
                 PLOG_FATAL(cb, "socket");
         if (opts->min_rto)
@@ -190,11 +192,13 @@ static void server_accept(int fd_listen, int epfd, struct thread *t)
 
 static void run_client(struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         const int flows_in_this_thread = flows_in_thread(opts->num_flows,
                                                          opts->num_threads,
                                                          t->index);
         struct callbacks *cb = t->cb;
+        struct addrinfo *ai = t->ai;
         struct epoll_event *events;
         struct flow *stop_fl;
         int epfd, i;
@@ -220,6 +224,14 @@ static void run_client(struct thread *t)
                 }
                 client_events(t, epfd, events, nfds, buf);
         }
+
+        /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
+        for (i = 0; i < flows_in_this_thread; i++) {
+                if (do_socket_close(ss, -1, ai) < 0)
+                        /* PLOG_FATAL(cb, "close"); */
+                        /* XXX: ignore errors */ ;
+        }
+
         free(buf);
         free(events);
         free(stop_fl);
@@ -230,6 +242,7 @@ static void server_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, int fd_listen,
                           char *buf)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         ssize_t num_bytes;
@@ -254,7 +267,7 @@ static void server_events(struct thread *t, int epfd,
 
                         if (to_read > opts->buffer_size)
                                 to_read = opts->buffer_size;
-                        num_bytes = read(flow->fd, buf, to_read);
+                        num_bytes = do_read(ss, flow->fd, buf, to_read, 0);
                         if (num_bytes == -1) {
                                 PLOG_ERROR(cb, "read");
                                 continue;
@@ -284,7 +297,7 @@ static void server_events(struct thread *t, int epfd,
                                 to_write = opts->buffer_size;
                                 flags |= MSG_MORE;
                         }
-                        num_bytes = send(flow->fd, buf, to_write, flags);
+                        num_bytes = do_write(ss, flow->fd, buf, to_write, flags);
                         if (num_bytes == -1) {
                                 PLOG_ERROR(cb, "write");
                                 continue;
@@ -310,6 +323,7 @@ static void server_events(struct thread *t, int epfd,
 
 static void run_server(struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
@@ -319,7 +333,7 @@ static void run_server(struct thread *t)
         int fd_listen, epfd;
         char *buf;
 
-        fd_listen = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        fd_listen = do_socket_open(ss, ai);
         if (fd_listen == -1)
                 PLOG_FATAL(cb, "socket");
         set_reuseport(fd_listen, cb);
@@ -348,12 +362,15 @@ static void run_server(struct thread *t)
                 }
                 server_events(t, epfd, events, nfds, fd_listen, buf);
         }
+
+        if (do_socket_close(ss, fd_listen, ai) < 0)
+                PLOG_FATAL(cb, "close");
+
         free(buf);
         free(events);
         free(stop_fl);
         free(listen_fl);
         do_close(epfd);
-        do_close(fd_listen);
 }
 
 static void *thread_start(void *arg)
