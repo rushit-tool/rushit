@@ -51,6 +51,7 @@ static inline void track_finish_time(struct flow *flow)
 static void client_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, char *buf)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         struct flow *flow;
@@ -76,7 +77,7 @@ static void client_events(struct thread *t, int epfd,
                                 flags |= MSG_MORE;
                         }
                         track_write_time(opts, flow);
-                        num_bytes = send(flow->fd, buf, to_write, flags);
+                        num_bytes = do_write(ss, flow->fd, buf, to_write, flags);
                         if (num_bytes == -1) {
                                 PLOG_ERROR(cb, "write");
                                 continue;
@@ -94,7 +95,7 @@ static void client_events(struct thread *t, int epfd,
 
                         if (to_read > opts->buffer_size)
                                 to_read = opts->buffer_size;
-                        num_bytes = read(flow->fd, buf, to_read);
+                        num_bytes = do_read(ss, flow->fd, buf, to_read, 0);
                         if (num_bytes == -1) {
                                 PLOG_ERROR(cb, "read");
                                 continue;
@@ -241,6 +242,7 @@ static void server_events(struct thread *t, int epfd,
                           struct epoll_event *events, int nfds, int fd_listen,
                           char *buf)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         ssize_t num_bytes;
@@ -265,7 +267,7 @@ static void server_events(struct thread *t, int epfd,
 
                         if (to_read > opts->buffer_size)
                                 to_read = opts->buffer_size;
-                        num_bytes = read(flow->fd, buf, to_read);
+                        num_bytes = do_read(ss, flow->fd, buf, to_read, 0);
                         if (num_bytes == -1) {
                                 PLOG_ERROR(cb, "read");
                                 continue;
@@ -295,7 +297,7 @@ static void server_events(struct thread *t, int epfd,
                                 to_write = opts->buffer_size;
                                 flags |= MSG_MORE;
                         }
-                        num_bytes = send(flow->fd, buf, to_write, flags);
+                        num_bytes = do_write(ss, flow->fd, buf, to_write, flags);
                         if (num_bytes == -1) {
                                 PLOG_ERROR(cb, "write");
                                 continue;
