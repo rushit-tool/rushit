@@ -166,11 +166,13 @@ static void client_connect(int flow_id, int epfd, struct thread *t)
 
 static void run_client(struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         const int flows_in_this_thread = flows_in_thread(opts->num_flows,
                                                          opts->num_threads,
                                                          t->index);
         struct callbacks *cb = t->cb;
+        struct addrinfo *ai = t->ai;
         struct epoll_event *events;
         struct flow *stop_fl;
         int epfd, i;
@@ -203,8 +205,11 @@ static void run_client(struct thread *t)
         }
 
         /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
-        for (i = 0; i < flows_in_this_thread; i++)
-                script_slave_close_hook(t->script_slave, -1, t->ai);
+        for (i = 0; i < flows_in_this_thread; i++) {
+                if (do_socket_close(ss, -1, ai) < 0)
+                        /* PLOG_FATAL(cb, "close"); */
+                        /* XXX: ignore errors */ ;
+        }
 
         free(buf);
         free(events);
@@ -258,14 +263,14 @@ static void run_server(struct thread *t)
                 process_events(t, epfd, events, nfds, fd_listen, buf);
         }
 
-        script_slave_close_hook(t->script_slave, fd_listen, t->ai);
+        if (do_socket_close(ss, fd_listen, ai) < 0)
+                PLOG_FATAL(cb, "close");
 
         free(buf);
         free(events);
         free(stop_fl);
         free(listen_fl);
         do_close(epfd);
-        do_close(fd_listen);
 }
 
 static void *worker_thread(void *arg)
