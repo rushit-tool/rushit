@@ -82,7 +82,6 @@ static void process_events(struct thread *t, int epfd,
         struct callbacks *cb = t->cb;
         struct timespec ts;
         ssize_t num_bytes;
-        int flags = 0;
         int i;
 
         for (i = 0; i < nfds; i++) {
@@ -102,7 +101,7 @@ static void process_events(struct thread *t, int epfd,
                 if (opts->enable_read && (events[i].events & EPOLLIN)) {
 read_again:
                         num_bytes = do_read(ss, flow->fd, buf,
-                                            opts->buffer_size, flags);
+                                            opts->buffer_size, 0);
                         if (num_bytes == -1) {
                                 if (errno != EAGAIN)
                                         PLOG_ERROR(cb, "read");
@@ -121,7 +120,7 @@ read_again:
                 if (opts->enable_write && (events[i].events & EPOLLOUT)) {
 write_again:
                         num_bytes = do_write(ss, flow->fd, buf,
-                                             opts->buffer_size, flags);
+                                             opts->buffer_size, 0);
                         if (num_bytes == -1) {
                                 if (errno != EAGAIN)
                                         PLOG_ERROR(cb, "write");
