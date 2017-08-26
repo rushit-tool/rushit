@@ -142,6 +142,7 @@ static void client_connect(int i, int epfd, struct thread *t)
         fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (fd == -1)
                 PLOG_FATAL(cb, "socket");
+        script_slave_socket_hook(t->script_slave, fd, ai);
         if (opts->min_rto)
                 set_min_rto(fd, opts->min_rto, cb);
         if (opts->debug)
@@ -220,6 +221,11 @@ static void run_client(struct thread *t)
                 }
                 client_events(t, epfd, events, nfds, buf);
         }
+
+        /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
+        for (i = 0; i < flows_in_this_thread; i++)
+                script_slave_close_hook(t->script_slave, -1, t->ai);
+
         free(buf);
         free(events);
         free(stop_fl);
@@ -322,6 +328,7 @@ static void run_server(struct thread *t)
         fd_listen = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
         if (fd_listen == -1)
                 PLOG_FATAL(cb, "socket");
+        script_slave_socket_hook(t->script_slave, fd_listen, ai);
         set_reuseport(fd_listen, cb);
         set_reuseaddr(fd_listen, 1, cb);
         if (bind(fd_listen, ai->ai_addr, ai->ai_addrlen))
@@ -348,6 +355,9 @@ static void run_server(struct thread *t)
                 }
                 server_events(t, epfd, events, nfds, fd_listen, buf);
         }
+
+        script_slave_close_hook(t->script_slave, fd_listen, ai);
+
         free(buf);
         free(events);
         free(stop_fl);

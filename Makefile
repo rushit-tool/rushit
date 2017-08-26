@@ -175,12 +175,13 @@ clean-tests:
 check-unit: $(test-binaries)
 	$(unit-test-dir)/t_script
 
-check-func: dummy_test tcp_stream
+check-func: dummy_test tcp_stream tcp_rr
 	$(func-test-dir)/0001
 	$(func-test-dir)/0002
 	$(func-test-dir)/0003
 	$(func-test-dir)/0004
 	$(func-test-dir)/0005
+	$(func-test-dir)/0006
 
 check: check-unit check-func
 
