@@ -138,11 +138,14 @@ static void client_events(struct thread *t, int epfd,
 
 static void client_connect(int i, int epfd, struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
+        struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
-        int fd = -1;
+        int fd;
 
-        /* STUB: Create socket */
-        script_slave_socket_hook(t->script_slave, fd, ai);
+        fd = do_socket_open(ss, ai);
+        if (fd == -1)
+                PLOG_FATAL(cb, "socket");
         /* STUB: Set socket options */
         /* STUB: Connect socket */
         /* STUB: Add flow */
@@ -250,8 +253,10 @@ static void server_events(struct thread *t, int epfd,
 
 static void run_server(struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
+        struct addrinfo *ai = t->ai;
         struct epoll_event *events;
         struct flow *stop_fl;
         int fd_listen = -1, epfd;
@@ -259,8 +264,9 @@ static void run_server(struct thread *t)
 
         assert(opts->maxevents > 0);
 
-        /* STUB: Create data plane listening socket */
-        script_slave_socket_hook(t->script_slave, fd_listen, t->ai);
+        fd_listen = do_socket_open(ss, ai);
+        if (fd_listen == -1)
+                PLOG_FATAL(cb, "socket");
         /* STUB: Set socket options */
         /* STUB: Bind & listen */
 

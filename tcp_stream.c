@@ -140,16 +140,16 @@ write_again:
 
 static void client_connect(int flow_id, int epfd, struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
         struct flow *flow;
         int fd;
 
-        fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        fd = do_socket_open(ss, ai);
         if (fd == -1)
                 PLOG_FATAL(cb, "socket");
-        script_slave_socket_hook(t->script_slave, fd, ai);
         if (opts->min_rto)
                 set_min_rto(fd, opts->min_rto, cb);
         if (opts->debug)
@@ -214,6 +214,7 @@ static void run_client(struct thread *t)
 
 static void run_server(struct thread *t)
 {
+        struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
@@ -223,10 +224,9 @@ static void run_server(struct thread *t)
         int fd_listen, epfd;
         char *buf;
 
-        fd_listen = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        fd_listen = do_socket_open(ss, ai);
         if (fd_listen == -1)
                 PLOG_FATAL(cb, "socket");
-        script_slave_socket_hook(t->script_slave, fd_listen, ai);
         set_reuseport(fd_listen, cb);
         set_reuseaddr(fd_listen, 1, cb);
         if (bind(fd_listen, ai->ai_addr, ai->ai_addrlen))
