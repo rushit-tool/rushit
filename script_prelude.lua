@@ -1,6 +1,7 @@
 local F = require("ffi")
 local S = require("syscall")
 
+-- XXX: Push to ljsyscall?
 F.cdef[[
 struct addrinfo {
         int              ai_flags;
@@ -12,7 +13,15 @@ struct addrinfo {
         char            *ai_canonname;
         struct addrinfo *ai_next;
 };
+
+struct scm_timestamping {
+        struct timespec ts[3];
+};
 ]]
+
+scm_timestamping = function(ptr)
+  return F.cast(F.typeof("struct scm_timestamping *"), ptr)
+end
 
 --
 -- Constants
