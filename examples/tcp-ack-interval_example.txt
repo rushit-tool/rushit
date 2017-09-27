@@ -1,0 +1,87 @@
+Example of using Linux timestamping API to calculate time between ACKs.
+
+~/src/rushit $ ./tcp_stream > /dev/null &
+[1] 27782
+~/src/rushit $ ./tcp_stream -c -l 1 --script examples/tcp-ack-interval.lua
+VERSION=1.1.0
+all_samples=
+port=12867
+control_port=12866
+host=
+local_host=
+delay=0
+max_pacing_rate=0
+interval=1.000000
+edge_trigger=0
+enable_write=1
+enable_read=0
+nonblocking=0
+logtostderr=0
+reuseaddr=0
+pin_cpu=0
+dry_run=0
+debug=0
+client=1
+ipv6=0
+ipv4=0
+suicide_length=0
+listen_backlog=128
+buffer_size=16384
+test_length=1
+num_clients=1
+num_threads=1
+num_flows=1
+maxevents=1000
+min_rto=0
+magic=42
+script=examples/tcp-ack-interval.lua
+total_run_time=1
+46
+28
+59.5
+126.25
+1.25
+40.75
+24
+17.75
+51.5
+60.5
+48.75
+296.5
+1
+25.25
+1
+[... lots of samples ...]
+24.5
+15.75
+68
+1.25
+14.5
+0.75
+23.75
+20.5
+21.75
+82.75
+0.75
+11.25
+0.75
+21.75
+138.75
+invalid_secret_count=0
+time_start=0.000000000
+utime_start=0.005645
+utime_end=0.460650
+stime_start=0.001902
+stime_end=0.465369
+maxrss_start=4484
+maxrss_end=6424
+minflt_start=433
+minflt_end=1194
+majflt_start=0
+majflt_end=0
+nvcsw_start=2
+nvcsw_end=6
+nivcsw_start=0
+nivcsw_end=144
+[1]+  Done                    ./tcp_stream > /dev/null
+~/src/rushit $
