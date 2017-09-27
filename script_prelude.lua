@@ -205,3 +205,4 @@ sockaddr_in = T.sockaddr_in
 getsockopt = S.getsockopt
 recvmsg = S.recvmsg
 sendmsg = S.sendmsg
+setsockopt = S.setsockopt
