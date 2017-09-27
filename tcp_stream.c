@@ -134,6 +134,15 @@ write_again:
                         if (opts->edge_trigger)
                                 goto write_again;
                 }
+                if (events[i].events & EPOLLERR) {
+                        num_bytes = do_readerr(ss, flow->fd, buf,
+                                               opts->buffer_size, 0);
+                        if (num_bytes == -1) {
+                                if (errno != EAGAIN)
+                                        PLOG_ERROR(cb, "readerr");
+                                continue;
+                        }
+                }
         }
 }
 
