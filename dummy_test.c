@@ -44,13 +44,13 @@ static struct flow fake_flow = {
 static struct epoll_event fake_client_events[] = {
         { .events = EPOLLOUT, .data = { .ptr = &fake_flow } },
         { .events = EPOLLIN,  .data = { .ptr = &fake_flow } },
-        { .events = EPOLLPRI, .data = { .ptr = &fake_flow } },
+        { .events = EPOLLERR, .data = { .ptr = &fake_flow } },
 };
 
 static struct epoll_event fake_server_events[] = {
         { .events = EPOLLIN,  .data = { .ptr = &fake_flow } },
         { .events = EPOLLOUT, .data = { .ptr = &fake_flow } },
-        { .events = EPOLLPRI, .data = { .ptr = &fake_flow } },
+        { .events = EPOLLERR, .data = { .ptr = &fake_flow } },
 };
 
 static struct epoll_event *fake_events;
@@ -121,7 +121,7 @@ static void client_events(struct thread *t, int epfd,
                                            num_bytes);
                                 continue;
                         }
-                } else if (events[i].events & EPOLLPRI) {
+                } else if (events[i].events & EPOLLERR) {
                         ssize_t to_read = 0;
                         int flags = 0;
 
@@ -241,7 +241,7 @@ static void server_events(struct thread *t, int epfd,
                                            num_bytes);
                                 continue;
                         }
-                } else if (events[i].events & EPOLLPRI) {
+                } else if (events[i].events & EPOLLERR) {
                         ssize_t to_read = 0;
                         int flags = 0;
 
