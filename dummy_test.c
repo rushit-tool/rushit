@@ -219,7 +219,7 @@ static void server_events(struct thread *t, int epfd,
                 }
                 /* STUB: Accept incoming data connections */
                 /* STUB: Delete flow on EPOLLRDHUP */
-                if (events[i].events & EPOLLIN) {
+                if (events[i].events & EPOLLOUT) {
                         ssize_t to_write = flow->bytes_to_write;
                         int flags = 0;
 
@@ -230,7 +230,7 @@ static void server_events(struct thread *t, int epfd,
                                            num_bytes);
                                 continue;
                         }
-                } else if (events[i].events & EPOLLOUT) {
+                } else if (events[i].events & EPOLLIN) {
                         ssize_t to_read = flow->bytes_to_read;
                         int flags = 0;
 
