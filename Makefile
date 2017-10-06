@@ -183,6 +183,7 @@ check-func: dummy_test tcp_stream tcp_rr
 	$(func-test-dir)/0005
 	$(func-test-dir)/0006
 	$(func-test-dir)/0007
+	$(func-test-dir)/0008
 
 check: check-unit check-func
 
