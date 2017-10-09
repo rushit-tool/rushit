@@ -29,6 +29,12 @@
 #include "script.h"
 
 
+struct main_context {
+        void *(*worker_func)(void *);
+        struct thread *workers;
+        int n_workers;
+};
+
 struct rusage_interval {
         struct timespec time_start; /* shared by flows */
         pthread_mutex_t time_start_mutex;
@@ -73,8 +79,7 @@ static int get_cpuset(cpu_set_t *cpuset, struct callbacks *cb)
         return num_cores;
 }
 
-static void start_worker_threads(struct callbacks *cb, struct thread *threads,
-                                 int n_threads, void *(*thread_func)(void *),
+static void start_worker_threads(struct callbacks *cb, struct main_context *ctx,
                                  bool pin_cpu)
 {
         CLEANUP(free) cpu_set_t *cpu_set = NULL;
@@ -93,7 +98,7 @@ static void start_worker_threads(struct callbacks *cb, struct thread *threads,
         if (s != 0)
                 LOG_FATAL(cb, "pthread_attr_init: %s", strerror(s));
 
-        for (i = 0, t = threads; i < n_threads; i++, t++) {
+        for (i = 0, t = ctx->workers; i < ctx->n_workers; i++, t++) {
                 if (pin_cpu) {
                         s = pthread_attr_setaffinity_np(&attr,
                                                         sizeof(*cpu_set),
@@ -104,7 +109,7 @@ static void start_worker_threads(struct callbacks *cb, struct thread *threads,
                         }
                 }
 
-                s = pthread_create(&t->id, &attr, thread_func, t);
+                s = pthread_create(&t->id, &attr, ctx->worker_func, t);
                 if (s != 0)
                         LOG_FATAL(cb, "pthread_create: %s", strerror(s));
         }
@@ -151,22 +156,22 @@ struct thread *create_worker_threads(struct options *opts, struct callbacks *cb,
         return t;
 }
 
-void stop_worker_threads(struct callbacks *cb, int num_threads,
-                         struct thread *t)
+void stop_worker_threads(struct callbacks *cb, struct main_context *ctx)
 {
+        struct thread *t;
         int i, s;
 
         // tell them to stop
-        for (i = 0; i < num_threads; i++) {
-                if (eventfd_write(t[i].stop_efd, 1))
+        for (i = 0, t = ctx->workers; i < ctx->n_workers; i++, t++) {
+                if (eventfd_write(t->stop_efd, 1))
                         PLOG_FATAL(cb, "eventfd_write");
                 else
                         LOG_INFO(cb, "told thread %d to stop", i);
         }
 
         // wait for them to stop
-        for (i = 0; i < num_threads; i++) {
-                s = pthread_join(t[i].id, NULL);
+        for (i = 0, t = ctx->workers; i < ctx->n_workers; i++, t++) {
+                s = pthread_join(t->id, NULL);
                 if (s != 0)
                         LOG_FATAL(cb, "pthread_join: %s", strerror(s));
                 else
@@ -189,11 +194,10 @@ static void free_worker_threads(int num_threads, struct thread *t)
 
 static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
                                struct rusage_interval *rui,
-                               struct thread *threads, int n_threads,
-                               void *(*thread_func)(void *), bool pin_cpu,
+                               struct main_context *ctx, bool pin_cpu,
                                pthread_barrier_t *threads_ready)
 {
-        start_worker_threads(cb, threads, n_threads, thread_func, pin_cpu);
+        start_worker_threads(cb, ctx, pin_cpu);
         LOG_INFO(cb, "started worker threads");
 
         pthread_barrier_wait(threads_ready);
@@ -203,7 +207,7 @@ static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
         control_plane_wait_until_done(cp);
         getrusage(RUSAGE_SELF, &rui->rusage_end);
 
-        stop_worker_threads(cb, n_threads, threads);
+        stop_worker_threads(cb, ctx);
         LOG_INFO(cb, "stopped worker threads");
 }
 
@@ -245,8 +249,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                 .time_start = { 0 },
                 .time_start_mutex = PTHREAD_MUTEX_INITIALIZER,
         };
+        struct main_context ctx = { 0 };
         struct addrinfo *ai;
-        struct thread *ts; // worker threads
         struct control_plane *cp;
         struct script_engine *se;
         int r;
@@ -269,8 +273,10 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                 LOG_FATAL(cb, "pthread_barrier_init: %s", strerror(r));
 
         // start threads *after* control plane is up, to reuse addrinfo.
-        ts = create_worker_threads(opts, cb, opts->num_threads, &ready_barrier,
-                                   &rui, ai, se);
+        ctx.worker_func = thread_func;
+        ctx.n_workers = opts->num_threads;
+        ctx.workers = create_worker_threads(opts, cb, ctx.n_workers,
+                                            &ready_barrier, &rui, ai, se);
         free(ai);
 
         if (opts->script) {
@@ -279,8 +285,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
         }
-        run_worker_threads(cb, cp, &rui, ts, opts->num_threads, thread_func,
-                           opts->pin_cpu, &ready_barrier);
+        run_worker_threads(cb, cp, &rui, &ctx, opts->pin_cpu, &ready_barrier);
 
         r = pthread_barrier_destroy(&ready_barrier);
         if (r != 0)
@@ -289,8 +294,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         control_plane_stop(cp);
         PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
         report_rusage(cb, &rui);
-        report_stats(ts);
-        free_worker_threads(opts->num_threads, ts);
+        report_stats(ctx.workers);
+        free_worker_threads(ctx.n_workers, ctx.workers);
         control_plane_destroy(cp);
         se = script_engine_destroy(se);
 
