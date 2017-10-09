@@ -133,9 +133,6 @@ void create_worker_threads(struct options *opts, struct callbacks *cb,
                                   strerror(-s));
                 }
         }
-
-        start_worker_threads(cb, t, opts->num_threads, thread_func,
-                             opts->pin_cpu);
 }
 
 void stop_worker_threads(struct callbacks *cb, int num_threads,
@@ -221,6 +218,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                               &time_start, &time_start_mutex, &rusage_start, ai,
                               se);
         free(ai);
+        start_worker_threads(cb, ts, opts->num_threads, thread_func,
+                             opts->pin_cpu);
         LOG_INFO(cb, "started worker threads");
 
         pthread_barrier_wait(&ready_barrier);
