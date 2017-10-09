@@ -63,30 +63,59 @@ static int get_cpuset(cpu_set_t *cpuset, struct callbacks *cb)
         return num_cores;
 }
 
-void start_worker_threads(struct options *opts, struct callbacks *cb,
+static void start_worker_threads(struct callbacks *cb, struct thread *threads,
+                                 int n_threads, void *(*thread_func)(void *),
+                                 bool pin_cpu)
+{
+        CLEANUP(free) cpu_set_t *cpu_set = NULL;
+        pthread_attr_t attr;
+        struct thread *t;
+        int n_cores = 1;
+        int i, s;
+
+        cpu_set = calloc(CPU_SETSIZE, sizeof(*cpu_set));
+        if (!cpu_set)
+                PLOG_FATAL(cb, "calloc cpu_set");
+        if (pin_cpu)
+                n_cores = get_cpuset(cpu_set, cb);
+
+        s = pthread_attr_init(&attr);
+        if (s != 0)
+                LOG_FATAL(cb, "pthread_attr_init: %s", strerror(s));
+
+        for (i = 0, t = threads; i < n_threads; i++, t++) {
+                if (pin_cpu) {
+                        s = pthread_attr_setaffinity_np(&attr,
+                                                        sizeof(*cpu_set),
+                                                        &cpu_set[i % n_cores]);
+                        if (s != 0) {
+                                LOG_FATAL(cb, "pthread_attr_setaffinity_np: %s",
+                                          strerror(s));
+                        }
+                }
+
+                s = pthread_create(&t->id, &attr, thread_func, t);
+                if (s != 0)
+                        LOG_FATAL(cb, "pthread_create: %s", strerror(s));
+        }
+
+        s = pthread_attr_destroy(&attr);
+        if (s != 0)
+                LOG_FATAL(cb, "pthread_attr_destroy: %s", strerror(s));
+}
+
+void create_worker_threads(struct options *opts, struct callbacks *cb,
                           struct thread *t, void *(*thread_func)(void *),
                           pthread_barrier_t *ready, struct timespec *time_start,
                           pthread_mutex_t *time_start_mutex,
                           struct rusage *rusage_start, struct addrinfo *ai,
                           struct script_engine *se)
 {
-        cpu_set_t *cpuset;
-        pthread_attr_t attr;
-        int s, i, num_cores = 1;
+        int s, i;
 
-        cpuset = calloc(CPU_SETSIZE, sizeof(cpu_set_t));
-        if (!cpuset)
-                PLOG_FATAL(cb, "calloc cpuset");
         s = pthread_barrier_init(ready, NULL, opts->num_threads + 1);
         if (s != 0)
                 LOG_FATAL(cb, "pthread_barrier_init: %s", strerror(s));
-
-        s = pthread_attr_init(&attr);
-        if (s != 0)
-                LOG_FATAL(cb, "pthread_attr_init: %s", strerror(s));
-
-        if (opts->pin_cpu)
-                num_cores = get_cpuset(cpuset, cb);
 
         for (i = 0; i < opts->num_threads; i++) {
                 t[i].index = i;
@@ -107,26 +136,10 @@ void start_worker_threads(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "failed to create script slave: %s",
                                   strerror(-s));
                 }
-
-                if (opts->pin_cpu) {
-                        s = pthread_attr_setaffinity_np(&attr,
-                                                        sizeof(cpu_set_t),
-                                                        &cpuset[i % num_cores]);
-                        if (s != 0) {
-                                LOG_FATAL(cb, "pthread_attr_setaffinity_np: %s",
-                                          strerror(s));
-                        }
-                }
-
-                s = pthread_create(&t[i].id, &attr, thread_func, &t[i]);
-                if (s != 0)
-                        LOG_FATAL(cb, "pthread_create: %s", strerror(s));
         }
 
-        s = pthread_attr_destroy(&attr);
-        if (s != 0)
-                LOG_FATAL(cb, "pthread_attr_destroy: %s", strerror(s));
-        free(cpuset);
+        start_worker_threads(cb, t, opts->num_threads, thread_func,
+                             opts->pin_cpu);
 
         pthread_barrier_wait(ready);
         LOG_INFO(cb, "worker threads are ready");
@@ -211,9 +224,9 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         // start threads *after* control plane is up, to reuse addrinfo.
         ts = calloc(opts->num_threads, sizeof(struct thread));
-        start_worker_threads(opts, cb, ts, thread_func, &ready_barrier,
-                             &time_start, &time_start_mutex, &rusage_start, ai,
-                             se);
+        create_worker_threads(opts, cb, ts, thread_func, &ready_barrier,
+                              &time_start, &time_start_mutex, &rusage_start, ai,
+                              se);
         free(ai);
         LOG_INFO(cb, "started worker threads");
 
