@@ -43,6 +43,7 @@ struct main_context {
         int n_workers;
 
         struct rusage_interval rusage_ival;
+        pthread_barrier_t threads_ready; /* shared by threads */
 };
 
 
@@ -195,15 +196,14 @@ static void free_worker_threads(int num_threads, struct thread *t)
 }
 
 static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
-                               struct main_context *ctx, bool pin_cpu,
-                               pthread_barrier_t *threads_ready)
+                               struct main_context *ctx, bool pin_cpu)
 {
         struct rusage_interval *rui = &ctx->rusage_ival;
 
         start_worker_threads(cb, ctx, pin_cpu);
         LOG_INFO(cb, "started worker threads");
 
-        pthread_barrier_wait(threads_ready);
+        pthread_barrier_wait(&ctx->threads_ready);
         LOG_INFO(cb, "worker threads are ready");
 
         getrusage(RUSAGE_SELF, &rui->rusage_start);
@@ -247,9 +247,9 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                     void *(*thread_func)(void *),
                     void (*report_stats)(struct thread *))
 {
-        pthread_barrier_t ready_barrier; // shared by threads
         struct main_context ctx = { 0 };
         struct rusage_interval *rui = &ctx.rusage_ival;
+        pthread_barrier_t *ready = &ctx.threads_ready;
         struct addrinfo *ai;
         struct control_plane *cp;
         struct script_engine *se;
@@ -272,15 +272,15 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                 LOG_FATAL(cb, "failed to create control plane");
         control_plane_start(cp, &ai);
 
-        r = pthread_barrier_init(&ready_barrier, NULL, opts->num_threads + 1);
+        r = pthread_barrier_init(ready, NULL, opts->num_threads + 1);
         if (r != 0)
                 LOG_FATAL(cb, "pthread_barrier_init: %s", strerror(r));
 
         // start threads *after* control plane is up, to reuse addrinfo.
         ctx.worker_func = thread_func;
         ctx.n_workers = opts->num_threads;
-        ctx.workers = create_worker_threads(opts, cb, ctx.n_workers,
-                                            &ready_barrier, rui, ai, se);
+        ctx.workers = create_worker_threads(opts, cb, ctx.n_workers, ready, rui,
+                                            ai, se);
         free(ai);
 
         if (opts->script) {
@@ -289,9 +289,9 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
         }
-        run_worker_threads(cb, cp, &ctx, opts->pin_cpu, &ready_barrier);
+        run_worker_threads(cb, cp, &ctx, opts->pin_cpu);
 
-        r = pthread_barrier_destroy(&ready_barrier);
+        r = pthread_barrier_destroy(ready);
         if (r != 0)
                 LOG_FATAL(cb, "pthread_barrier_destroy: %s", strerror(r));
 
