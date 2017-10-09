@@ -38,6 +38,9 @@ struct rusage_interval {
 };
 
 struct main_context {
+        struct callbacks *cb;
+        struct options *opts;
+
         struct control_plane *cp;
 
         void *(*worker_func)(void *);
@@ -197,12 +200,13 @@ static void free_worker_threads(int num_threads, struct thread *t)
         free(t);
 }
 
-static void run_worker_threads(struct callbacks *cb, struct main_context *ctx,
-                               bool pin_cpu)
+static void run_worker_threads(struct main_context *ctx)
 {
+        struct callbacks *cb = ctx->cb;
+        struct options *opts = ctx->opts;
         struct rusage_interval *rui = &ctx->rusage_ival;
 
-        start_worker_threads(cb, ctx, pin_cpu);
+        start_worker_threads(cb, ctx, opts->pin_cpu);
         LOG_INFO(cb, "started worker threads");
 
         pthread_barrier_wait(&ctx->threads_ready);
@@ -249,7 +253,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                     void *(*thread_func)(void *),
                     void (*report_stats)(struct thread *))
 {
-        struct main_context ctx = { 0 };
+        struct main_context ctx = { .cb = cb, .opts = opts };
         struct rusage_interval *rui = &ctx.rusage_ival;
         pthread_barrier_t *ready = &ctx.threads_ready;
         struct addrinfo *ai;
@@ -290,7 +294,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
         }
-        run_worker_threads(cb, &ctx, opts->pin_cpu);
+        run_worker_threads(&ctx);
 
         r = pthread_barrier_destroy(ready);
         if (r != 0)
