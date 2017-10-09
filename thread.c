@@ -115,7 +115,6 @@ static void start_worker_threads(struct callbacks *cb, struct thread *threads,
 }
 
 struct thread *create_worker_threads(struct options *opts, struct callbacks *cb,
-                                     void *(*thread_func)(void *),
                                      int n_threads, pthread_barrier_t *ready,
                                      struct rusage_interval *rui,
                                      struct addrinfo *ai,
@@ -270,8 +269,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                 LOG_FATAL(cb, "pthread_barrier_init: %s", strerror(r));
 
         // start threads *after* control plane is up, to reuse addrinfo.
-        ts = create_worker_threads(opts, cb, thread_func, opts->num_threads,
-                                   &ready_barrier, &rui, ai, se);
+        ts = create_worker_threads(opts, cb, opts->num_threads, &ready_barrier,
+                                   &rui, ai, se);
         free(ai);
 
         if (opts->script) {
