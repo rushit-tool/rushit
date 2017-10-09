@@ -29,18 +29,20 @@
 #include "script.h"
 
 
-struct main_context {
-        void *(*worker_func)(void *);
-        struct thread *workers;
-        int n_workers;
-};
-
 struct rusage_interval {
         struct timespec time_start; /* shared by flows */
         pthread_mutex_t time_start_mutex;
 
         struct rusage rusage_start; /* updated when first packet comes */
         struct rusage rusage_end;   /* updated only from main thread */
+};
+
+struct main_context {
+        void *(*worker_func)(void *);
+        struct thread *workers;
+        int n_workers;
+
+        struct rusage_interval rusage_ival;
 };
 
 
@@ -193,10 +195,11 @@ static void free_worker_threads(int num_threads, struct thread *t)
 }
 
 static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
-                               struct rusage_interval *rui,
                                struct main_context *ctx, bool pin_cpu,
                                pthread_barrier_t *threads_ready)
 {
+        struct rusage_interval *rui = &ctx->rusage_ival;
+
         start_worker_threads(cb, ctx, pin_cpu);
         LOG_INFO(cb, "started worker threads");
 
@@ -245,11 +248,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                     void (*report_stats)(struct thread *))
 {
         pthread_barrier_t ready_barrier; // shared by threads
-        struct rusage_interval rui = {
-                .time_start = { 0 },
-                .time_start_mutex = PTHREAD_MUTEX_INITIALIZER,
-        };
         struct main_context ctx = { 0 };
+        struct rusage_interval *rui = &ctx.rusage_ival;
         struct addrinfo *ai;
         struct control_plane *cp;
         struct script_engine *se;
@@ -258,6 +258,10 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         PRINT(cb, "total_run_time", "%d", opts->test_length);
         if (opts->dry_run)
                 return 0;
+
+        r = pthread_mutex_init(&rui->time_start_mutex, NULL);
+        if (r != 0)
+                LOG_FATAL(cb, "pthread_mutex_init: %s", strerror(r));
 
         r = script_engine_create(&se, cb, opts->client);
         if (r < 0)
@@ -276,7 +280,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         ctx.worker_func = thread_func;
         ctx.n_workers = opts->num_threads;
         ctx.workers = create_worker_threads(opts, cb, ctx.n_workers,
-                                            &ready_barrier, &rui, ai, se);
+                                            &ready_barrier, rui, ai, se);
         free(ai);
 
         if (opts->script) {
@@ -285,7 +289,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
         }
-        run_worker_threads(cb, cp, &rui, &ctx, opts->pin_cpu, &ready_barrier);
+        run_worker_threads(cb, cp, &ctx, opts->pin_cpu, &ready_barrier);
 
         r = pthread_barrier_destroy(&ready_barrier);
         if (r != 0)
@@ -293,11 +297,15 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         control_plane_stop(cp);
         PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
-        report_rusage(cb, &rui);
+        report_rusage(cb, rui);
         report_stats(ctx.workers);
         free_worker_threads(ctx.n_workers, ctx.workers);
         control_plane_destroy(cp);
         se = script_engine_destroy(se);
+
+        r = pthread_mutex_destroy(&rui->time_start_mutex);
+        if (r != 0)
+                LOG_FATAL(cb, "pthread_mutex_destroy: %s", strerror(r));
 
         return 0;
 }
