@@ -171,6 +171,26 @@ static void free_worker_threads(int num_threads, struct thread *t)
         free(t);
 }
 
+static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
+                               struct rusage *ru_start, struct rusage *ru_end,
+                               struct thread *threads, int n_threads,
+                               void *(*thread_func)(void *), bool pin_cpu,
+                               pthread_barrier_t *threads_ready)
+{
+        start_worker_threads(cb, threads, n_threads, thread_func, pin_cpu);
+        LOG_INFO(cb, "started worker threads");
+
+        pthread_barrier_wait(threads_ready);
+        LOG_INFO(cb, "worker threads are ready");
+
+        getrusage(RUSAGE_SELF, ru_start);
+        control_plane_wait_until_done(cp);
+        getrusage(RUSAGE_SELF, ru_end);
+
+        stop_worker_threads(cb, n_threads, threads);
+        LOG_INFO(cb, "stopped worker threads");
+}
+
 int run_main_thread(struct options *opts, struct callbacks *cb,
                     void *(*thread_func)(void *),
                     void (*report_stats)(struct thread *))
@@ -218,19 +238,10 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                               &time_start, &time_start_mutex, &rusage_start, ai,
                               se);
         free(ai);
-        start_worker_threads(cb, ts, opts->num_threads, thread_func,
-                             opts->pin_cpu);
-        LOG_INFO(cb, "started worker threads");
 
-        pthread_barrier_wait(&ready_barrier);
-        LOG_INFO(cb, "worker threads are ready");
-
-        getrusage(RUSAGE_SELF, &rusage_start); // rusage start!
-        control_plane_wait_until_done(cp);
-        getrusage(RUSAGE_SELF, &rusage_end); // rusage end!
-
-        stop_worker_threads(cb, opts->num_threads, ts);
-        LOG_INFO(cb, "stopped worker threads");
+        run_worker_threads(cb, cp, &rusage_start, &rusage_end, ts,
+                           opts->num_threads, thread_func, opts->pin_cpu,
+                           &ready_barrier);
 
         r = pthread_barrier_destroy(&ready_barrier);
         if (r != 0)
