@@ -113,10 +113,6 @@ void create_worker_threads(struct options *opts, struct callbacks *cb,
 {
         int s, i;
 
-        s = pthread_barrier_init(ready, NULL, opts->num_threads + 1);
-        if (s != 0)
-                LOG_FATAL(cb, "pthread_barrier_init: %s", strerror(s));
-
         for (i = 0; i < opts->num_threads; i++) {
                 t[i].index = i;
                 t[i].ai = copy_addrinfo(ai);
@@ -140,13 +136,10 @@ void create_worker_threads(struct options *opts, struct callbacks *cb,
 
         start_worker_threads(cb, t, opts->num_threads, thread_func,
                              opts->pin_cpu);
-
-        pthread_barrier_wait(ready);
-        LOG_INFO(cb, "worker threads are ready");
 }
 
 void stop_worker_threads(struct callbacks *cb, int num_threads,
-                         struct thread *t, pthread_barrier_t *ready)
+                         struct thread *t)
 {
         int i, s;
 
@@ -166,10 +159,6 @@ void stop_worker_threads(struct callbacks *cb, int num_threads,
                 else
                         LOG_INFO(cb, "joined thread %d", i);
         }
-
-        s = pthread_barrier_destroy(ready);
-        if (s != 0)
-                LOG_FATAL(cb, "pthread_barrier_destroy: %s", strerror(s));
 }
 
 static void free_worker_threads(int num_threads, struct thread *t)
@@ -222,6 +211,10 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                 LOG_FATAL(cb, "failed to create control plane");
         control_plane_start(cp, &ai);
 
+        r = pthread_barrier_init(&ready_barrier, NULL, opts->num_threads + 1);
+        if (r != 0)
+                LOG_FATAL(cb, "pthread_barrier_init: %s", strerror(r));
+
         // start threads *after* control plane is up, to reuse addrinfo.
         ts = calloc(opts->num_threads, sizeof(struct thread));
         create_worker_threads(opts, cb, ts, thread_func, &ready_barrier,
@@ -230,12 +223,19 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         free(ai);
         LOG_INFO(cb, "started worker threads");
 
+        pthread_barrier_wait(&ready_barrier);
+        LOG_INFO(cb, "worker threads are ready");
+
         getrusage(RUSAGE_SELF, &rusage_start); // rusage start!
         control_plane_wait_until_done(cp);
         getrusage(RUSAGE_SELF, &rusage_end); // rusage end!
 
-        stop_worker_threads(cb, opts->num_threads, ts, &ready_barrier);
+        stop_worker_threads(cb, opts->num_threads, ts);
         LOG_INFO(cb, "stopped worker threads");
+
+        r = pthread_barrier_destroy(&ready_barrier);
+        if (r != 0)
+                LOG_FATAL(cb, "pthread_barrier_destroy: %s", strerror(r));
 
         control_plane_stop(cp);
         PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
