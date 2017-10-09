@@ -114,12 +114,19 @@ static void start_worker_threads(struct callbacks *cb, struct thread *threads,
                 LOG_FATAL(cb, "pthread_attr_destroy: %s", strerror(s));
 }
 
-void create_worker_threads(struct options *opts, struct callbacks *cb,
-                          struct thread *t, void *(*thread_func)(void *),
-                          pthread_barrier_t *ready, struct rusage_interval *rui,
-                          struct addrinfo *ai, struct script_engine *se)
+struct thread *create_worker_threads(struct options *opts, struct callbacks *cb,
+                                     void *(*thread_func)(void *),
+                                     int n_threads, pthread_barrier_t *ready,
+                                     struct rusage_interval *rui,
+                                     struct addrinfo *ai,
+                                     struct script_engine *se)
 {
+        struct thread *t;
         int s, i;
+
+        t = calloc(n_threads, sizeof(*t));
+        if (!t)
+                LOG_FATAL(cb, "calloc worker threads");
 
         for (i = 0; i < opts->num_threads; i++) {
                 t[i].index = i;
@@ -141,6 +148,8 @@ void create_worker_threads(struct options *opts, struct callbacks *cb,
                                   strerror(-s));
                 }
         }
+
+        return t;
 }
 
 void stop_worker_threads(struct callbacks *cb, int num_threads,
@@ -261,9 +270,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                 LOG_FATAL(cb, "pthread_barrier_init: %s", strerror(r));
 
         // start threads *after* control plane is up, to reuse addrinfo.
-        ts = calloc(opts->num_threads, sizeof(struct thread));
-        create_worker_threads(opts, cb, ts, thread_func, &ready_barrier, &rui,
-                              ai, se);
+        ts = create_worker_threads(opts, cb, thread_func, opts->num_threads,
+                                   &ready_barrier, &rui, ai, se);
         free(ai);
 
         if (opts->script) {
