@@ -191,6 +191,33 @@ static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
         LOG_INFO(cb, "stopped worker threads");
 }
 
+static void report_rusage(struct callbacks *cb,
+                          const struct timespec *time_start,
+                          const struct rusage *rusage_start,
+                          const struct rusage *rusage_end)
+{
+        PRINT(cb, "time_start", "%ld.%09ld",
+              time_start->tv_sec, time_start->tv_nsec);
+        PRINT(cb, "utime_start", "%ld.%06ld",
+              rusage_start->ru_utime.tv_sec, rusage_start->ru_utime.tv_usec);
+        PRINT(cb, "utime_end", "%ld.%06ld",
+              rusage_end->ru_utime.tv_sec, rusage_end->ru_utime.tv_usec);
+        PRINT(cb, "stime_start", "%ld.%06ld",
+              rusage_start->ru_stime.tv_sec, rusage_start->ru_stime.tv_usec);
+        PRINT(cb, "stime_end", "%ld.%06ld",
+              rusage_end->ru_stime.tv_sec, rusage_end->ru_stime.tv_usec);
+        PRINT(cb, "maxrss_start", "%ld", rusage_start->ru_maxrss);
+        PRINT(cb, "maxrss_end", "%ld", rusage_end->ru_maxrss);
+        PRINT(cb, "minflt_start", "%ld", rusage_start->ru_minflt);
+        PRINT(cb, "minflt_end", "%ld", rusage_end->ru_minflt);
+        PRINT(cb, "majflt_start", "%ld", rusage_start->ru_majflt);
+        PRINT(cb, "majflt_end", "%ld", rusage_end->ru_majflt);
+        PRINT(cb, "nvcsw_start", "%ld", rusage_start->ru_nvcsw);
+        PRINT(cb, "nvcsw_end", "%ld", rusage_end->ru_nvcsw);
+        PRINT(cb, "nivcsw_start", "%ld", rusage_start->ru_nivcsw);
+        PRINT(cb, "nivcsw_end", "%ld", rusage_end->ru_nivcsw);
+}
+
 int run_main_thread(struct options *opts, struct callbacks *cb,
                     void *(*thread_func)(void *),
                     void (*report_stats)(struct thread *))
@@ -249,29 +276,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         control_plane_stop(cp);
         PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
-        // begin printing rusage
-        PRINT(cb, "time_start", "%ld.%09ld", time_start.tv_sec,
-              time_start.tv_nsec);
-        PRINT(cb, "utime_start", "%ld.%06ld", rusage_start.ru_utime.tv_sec,
-              rusage_start.ru_utime.tv_usec);
-        PRINT(cb, "utime_end", "%ld.%06ld", rusage_end.ru_utime.tv_sec,
-              rusage_end.ru_utime.tv_usec);
-        PRINT(cb, "stime_start", "%ld.%06ld", rusage_start.ru_stime.tv_sec,
-              rusage_start.ru_stime.tv_usec);
-        PRINT(cb, "stime_end", "%ld.%06ld", rusage_end.ru_stime.tv_sec,
-              rusage_end.ru_stime.tv_usec);
-        PRINT(cb, "maxrss_start", "%ld", rusage_start.ru_maxrss);
-        PRINT(cb, "maxrss_end", "%ld", rusage_end.ru_maxrss);
-        PRINT(cb, "minflt_start", "%ld", rusage_start.ru_minflt);
-        PRINT(cb, "minflt_end", "%ld", rusage_end.ru_minflt);
-        PRINT(cb, "majflt_start", "%ld", rusage_start.ru_majflt);
-        PRINT(cb, "majflt_end", "%ld", rusage_end.ru_majflt);
-        PRINT(cb, "nvcsw_start", "%ld", rusage_start.ru_nvcsw);
-        PRINT(cb, "nvcsw_end", "%ld", rusage_end.ru_nvcsw);
-        PRINT(cb, "nivcsw_start", "%ld", rusage_start.ru_nivcsw);
-        PRINT(cb, "nivcsw_end", "%ld", rusage_end.ru_nivcsw);
-        // end printing rusage
-
+        report_rusage(cb, &time_start, &rusage_start, &rusage_end);
         report_stats(ts);
         free_worker_threads(opts->num_threads, ts);
         control_plane_destroy(cp);
