@@ -38,6 +38,8 @@ struct rusage_interval {
 };
 
 struct main_context {
+        struct control_plane *cp;
+
         void *(*worker_func)(void *);
         struct thread *workers;
         int n_workers;
@@ -195,8 +197,8 @@ static void free_worker_threads(int num_threads, struct thread *t)
         free(t);
 }
 
-static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
-                               struct main_context *ctx, bool pin_cpu)
+static void run_worker_threads(struct callbacks *cb, struct main_context *ctx,
+                               bool pin_cpu)
 {
         struct rusage_interval *rui = &ctx->rusage_ival;
 
@@ -207,7 +209,7 @@ static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
         LOG_INFO(cb, "worker threads are ready");
 
         getrusage(RUSAGE_SELF, &rui->rusage_start);
-        control_plane_wait_until_done(cp);
+        control_plane_wait_until_done(ctx->cp);
         getrusage(RUSAGE_SELF, &rui->rusage_end);
 
         stop_worker_threads(cb, ctx);
@@ -251,7 +253,6 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         struct rusage_interval *rui = &ctx.rusage_ival;
         pthread_barrier_t *ready = &ctx.threads_ready;
         struct addrinfo *ai;
-        struct control_plane *cp;
         struct script_engine *se;
         int r;
 
@@ -267,10 +268,10 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         if (r < 0)
                 LOG_FATAL(cb, "failed to create script engine: %s", strerror(-r));
 
-        cp = control_plane_create(opts, cb, se);
-        if (!cp)
+        ctx.cp = control_plane_create(opts, cb, se);
+        if (!ctx.cp)
                 LOG_FATAL(cb, "failed to create control plane");
-        control_plane_start(cp, &ai);
+        control_plane_start(ctx.cp, &ai);
 
         r = pthread_barrier_init(ready, NULL, opts->num_threads + 1);
         if (r != 0)
@@ -289,18 +290,18 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
         }
-        run_worker_threads(cb, cp, &ctx, opts->pin_cpu);
+        run_worker_threads(cb, &ctx, opts->pin_cpu);
 
         r = pthread_barrier_destroy(ready);
         if (r != 0)
                 LOG_FATAL(cb, "pthread_barrier_destroy: %s", strerror(r));
 
-        control_plane_stop(cp);
-        PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
+        control_plane_stop(ctx.cp);
+        PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(ctx.cp));
         report_rusage(cb, rui);
         report_stats(ctx.workers);
         free_worker_threads(ctx.n_workers, ctx.workers);
-        control_plane_destroy(cp);
+        control_plane_destroy(ctx.cp);
         se = script_engine_destroy(se);
 
         r = pthread_mutex_destroy(&rui->time_start_mutex);
