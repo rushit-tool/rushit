@@ -28,6 +28,16 @@
 #include "sample.h"
 #include "script.h"
 
+
+struct rusage_interval {
+        struct timespec time_start; /* shared by flows */
+        pthread_mutex_t time_start_mutex;
+
+        struct rusage rusage_start; /* updated when first packet comes */
+        struct rusage rusage_end;   /* updated only from main thread */
+};
+
+
 static int get_cpuset(cpu_set_t *cpuset, struct callbacks *cb)
 {
         int i, j, n, num_cores, physical_id[CPU_SETSIZE], core_id[CPU_SETSIZE];
@@ -106,10 +116,8 @@ static void start_worker_threads(struct callbacks *cb, struct thread *threads,
 
 void create_worker_threads(struct options *opts, struct callbacks *cb,
                           struct thread *t, void *(*thread_func)(void *),
-                          pthread_barrier_t *ready, struct timespec *time_start,
-                          pthread_mutex_t *time_start_mutex,
-                          struct rusage *rusage_start, struct addrinfo *ai,
-                          struct script_engine *se)
+                          pthread_barrier_t *ready, struct rusage_interval *rui,
+                          struct addrinfo *ai, struct script_engine *se)
 {
         int s, i;
 
@@ -123,9 +131,9 @@ void create_worker_threads(struct options *opts, struct callbacks *cb,
                 t[i].opts = opts;
                 t[i].cb = cb;
                 t[i].ready = ready;
-                t[i].time_start = time_start;
-                t[i].time_start_mutex = time_start_mutex;
-                t[i].rusage_start = rusage_start;
+                t[i].time_start = &rui->time_start;
+                t[i].time_start_mutex = &rui->time_start_mutex;
+                t[i].rusage_start = &rui->rusage_start;
 
                 s = script_slave_create(&t[i].script_slave, se);
                 if (s < 0) {
@@ -172,7 +180,7 @@ static void free_worker_threads(int num_threads, struct thread *t)
 }
 
 static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
-                               struct rusage *ru_start, struct rusage *ru_end,
+                               struct rusage_interval *rui,
                                struct thread *threads, int n_threads,
                                void *(*thread_func)(void *), bool pin_cpu,
                                pthread_barrier_t *threads_ready)
@@ -183,19 +191,21 @@ static void run_worker_threads(struct callbacks *cb, struct control_plane *cp,
         pthread_barrier_wait(threads_ready);
         LOG_INFO(cb, "worker threads are ready");
 
-        getrusage(RUSAGE_SELF, ru_start);
+        getrusage(RUSAGE_SELF, &rui->rusage_start);
         control_plane_wait_until_done(cp);
-        getrusage(RUSAGE_SELF, ru_end);
+        getrusage(RUSAGE_SELF, &rui->rusage_end);
 
         stop_worker_threads(cb, n_threads, threads);
         LOG_INFO(cb, "stopped worker threads");
 }
 
 static void report_rusage(struct callbacks *cb,
-                          const struct timespec *time_start,
-                          const struct rusage *rusage_start,
-                          const struct rusage *rusage_end)
+                          const struct rusage_interval *rui)
 {
+        const struct timespec *time_start = &rui->time_start;
+        const struct rusage *rusage_start = &rui->rusage_start;
+        const struct rusage *rusage_end = &rui->rusage_end;
+
         PRINT(cb, "time_start", "%ld.%09ld",
               time_start->tv_sec, time_start->tv_nsec);
         PRINT(cb, "utime_start", "%ld.%06ld",
@@ -223,13 +233,10 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                     void (*report_stats)(struct thread *))
 {
         pthread_barrier_t ready_barrier; // shared by threads
-
-        struct timespec time_start = {0}; // shared by flows
-        pthread_mutex_t time_start_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-        struct rusage rusage_start; // updated when first packet comes
-        struct rusage rusage_end; // local to this function, never pass out
-
+        struct rusage_interval rui = {
+                .time_start = { 0 },
+                .time_start_mutex = PTHREAD_MUTEX_INITIALIZER,
+        };
         struct addrinfo *ai;
         struct thread *ts; // worker threads
         struct control_plane *cp;
@@ -255,9 +262,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         // start threads *after* control plane is up, to reuse addrinfo.
         ts = calloc(opts->num_threads, sizeof(struct thread));
-        create_worker_threads(opts, cb, ts, thread_func, &ready_barrier,
-                              &time_start, &time_start_mutex, &rusage_start, ai,
-                              se);
+        create_worker_threads(opts, cb, ts, thread_func, &ready_barrier, &rui,
+                              ai, se);
         free(ai);
 
         if (opts->script) {
@@ -266,9 +272,8 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
         }
-        run_worker_threads(cb, cp, &rusage_start, &rusage_end, ts,
-                           opts->num_threads, thread_func, opts->pin_cpu,
-                           &ready_barrier);
+        run_worker_threads(cb, cp, &rui, ts, opts->num_threads, thread_func,
+                           opts->pin_cpu, &ready_barrier);
 
         r = pthread_barrier_destroy(&ready_barrier);
         if (r != 0)
@@ -276,7 +281,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
 
         control_plane_stop(cp);
         PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(cp));
-        report_rusage(cb, &time_start, &rusage_start, &rusage_end);
+        report_rusage(cb, &rui);
         report_stats(ts);
         free_worker_threads(opts->num_threads, ts);
         control_plane_destroy(cp);
