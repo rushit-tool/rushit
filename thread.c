@@ -253,7 +253,13 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                     void *(*thread_func)(void *),
                     void (*report_stats)(struct thread *))
 {
-        struct main_context ctx = { .cb = cb, .opts = opts };
+        struct main_context ctx = {
+                .cb = cb,
+                .opts = opts,
+                .rusage_ival = {
+                        .time_start_mutex = PTHREAD_MUTEX_INITIALIZER,
+                },
+        };
         struct rusage_interval *rui = &ctx.rusage_ival;
         pthread_barrier_t *ready = &ctx.threads_ready;
         struct addrinfo *ai;
@@ -263,10 +269,6 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         PRINT(cb, "total_run_time", "%d", opts->test_length);
         if (opts->dry_run)
                 return 0;
-
-        r = pthread_mutex_init(&rui->time_start_mutex, NULL);
-        if (r != 0)
-                LOG_FATAL(cb, "pthread_mutex_init: %s", strerror(r));
 
         r = script_engine_create(&se, cb, opts->client);
         if (r < 0)
@@ -307,10 +309,6 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         free_worker_threads(ctx.n_workers, ctx.workers);
         control_plane_destroy(ctx.cp);
         se = script_engine_destroy(se);
-
-        r = pthread_mutex_destroy(&rui->time_start_mutex);
-        if (r != 0)
-                LOG_FATAL(cb, "pthread_mutex_destroy: %s", strerror(r));
 
         return 0;
 }
