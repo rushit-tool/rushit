@@ -253,15 +253,16 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                     void *(*thread_func)(void *),
                     void (*report_stats)(struct thread *))
 {
-        struct main_context ctx = {
+        struct main_context ctx_ = {
                 .cb = cb,
                 .opts = opts,
                 .rusage_ival = {
                         .time_start_mutex = PTHREAD_MUTEX_INITIALIZER,
                 },
         };
-        struct rusage_interval *rui = &ctx.rusage_ival;
-        pthread_barrier_t *ready = &ctx.threads_ready;
+        struct main_context *ctx = &ctx_;
+        struct rusage_interval *rui = &ctx->rusage_ival;
+        pthread_barrier_t *ready = &ctx->threads_ready;
         struct addrinfo *ai;
         struct script_engine *se;
         int r;
@@ -274,20 +275,20 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         if (r < 0)
                 LOG_FATAL(cb, "failed to create script engine: %s", strerror(-r));
 
-        ctx.cp = control_plane_create(opts, cb, se);
-        if (!ctx.cp)
+        ctx->cp = control_plane_create(opts, cb, se);
+        if (!ctx->cp)
                 LOG_FATAL(cb, "failed to create control plane");
-        control_plane_start(ctx.cp, &ai);
+        control_plane_start(ctx->cp, &ai);
 
         r = pthread_barrier_init(ready, NULL, opts->num_threads + 1);
         if (r != 0)
                 LOG_FATAL(cb, "pthread_barrier_init: %s", strerror(r));
 
         // start threads *after* control plane is up, to reuse addrinfo.
-        ctx.worker_func = thread_func;
-        ctx.n_workers = opts->num_threads;
-        ctx.workers = create_worker_threads(opts, cb, ctx.n_workers, ready, rui,
-                                            ai, se);
+        ctx->worker_func = thread_func;
+        ctx->n_workers = opts->num_threads;
+        ctx->workers = create_worker_threads(opts, cb, ctx->n_workers, ready,
+                                             rui, ai, se);
         free(ai);
 
         if (opts->script) {
@@ -296,18 +297,18 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
         }
-        run_worker_threads(&ctx);
+        run_worker_threads(ctx);
 
         r = pthread_barrier_destroy(ready);
         if (r != 0)
                 LOG_FATAL(cb, "pthread_barrier_destroy: %s", strerror(r));
 
-        control_plane_stop(ctx.cp);
-        PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(ctx.cp));
+        control_plane_stop(ctx->cp);
+        PRINT(cb, "invalid_secret_count", "%d", control_plane_incidents(ctx->cp));
         report_rusage(cb, rui);
-        report_stats(ctx.workers);
-        free_worker_threads(ctx.n_workers, ctx.workers);
-        control_plane_destroy(ctx.cp);
+        report_stats(ctx->workers);
+        free_worker_threads(ctx->n_workers, ctx->workers);
+        control_plane_destroy(ctx->cp);
         se = script_engine_destroy(se);
 
         return 0;
