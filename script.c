@@ -114,6 +114,19 @@ static int store_hook_bytecode(struct script_engine *se, enum script_hook_id hid
         return 0;
 }
 
+static struct script_engine *get_context(lua_State *L)
+{
+        struct script_engine *se;
+
+        lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        se = lua_touserdata(L, -1);
+        assert(se);
+        lua_pop(L, 1);
+
+        return se;
+}
+
 static int store_hook(lua_State *L, enum run_mode run_mode,
                       enum script_hook_id hid)
 {
@@ -123,14 +136,7 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
         /* Expect a function argument */
         luaL_checktype(L, 1, LUA_TFUNCTION);
 
-        /* Get context */
-        lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
-        lua_gettable(L, LUA_REGISTRYINDEX);
-        se = lua_touserdata(L, -1);
-        lua_pop(L, 1);
-
-        assert(se);
-
+        se = get_context(L);
         if (se->run_mode == run_mode)
                rc = store_hook_bytecode(se, hid);
 
@@ -197,6 +203,19 @@ static int is_server_cb(lua_State *L)
         return 0;
 }
 
+static int run_cb(lua_State *L)
+{
+        struct script_engine *se;
+
+        se = get_context(L);
+        if (se->run_func) {
+                (*se->run_func)(se->run_data);
+                se->run_func = NULL; /* runs only once */
+        }
+
+        return 0;
+}
+
 static int tid_iter_cb(lua_State *L)
 {
         return 0;
@@ -223,6 +242,7 @@ static const struct luaL_Reg server_callbacks[] = {
 static const struct luaL_Reg common_callbacks[] = {
         { "is_client", is_client_cb },
         { "is_server", is_server_cb },
+        { "run",       run_cb },
         { "tid_iter",  tid_iter_cb },
         { NULL, NULL },
 };
@@ -303,12 +323,12 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
 
 static int run_script(struct script_engine *se,
                       int (*load_func)(lua_State *, const char *), const char *input,
-                      void (*wait_func)(void *data), void *wait_data)
+                      void (*run_func)(void *data), void *run_data)
 {
         int err;
 
-        se->wait_func = wait_func;
-        se->wait_data = wait_data;
+        se->run_func = run_func;
+        se->run_data = run_data;
 
         err = (*load_func)(se->L, input);
         if (err) {
@@ -321,8 +341,8 @@ static int run_script(struct script_engine *se,
                 return -errno_lua(err);
         }
 
-        if (wait_func)
-                (*wait_func)(wait_data);
+        /* If run() hasn't been called from the script, do it now */
+        run_cb(se->L);
 
         /* TODO: Propagate return value. */
         return 0;
@@ -333,24 +353,24 @@ static int run_script(struct script_engine *se,
  * Runs the script passed in a string.
  */
 int script_engine_run_string(struct script_engine *se, const char *script,
-                             void (*wait_func)(void *), void *wait_data)
+                             void (*run_func)(void *), void *run_data)
 {
         assert(se);
         assert(script);
 
-        return run_script(se, luaL_loadstring, script, wait_func, wait_data);
+        return run_script(se, luaL_loadstring, script, run_func, run_data);
 }
 
 /**
  * Runs the script from a given file.
  */
 int script_engine_run_file(struct script_engine *se, const char *filename,
-                            void (*wait_func)(void *), void *wait_data)
+                            void (*run_func)(void *), void *run_data)
 {
         assert(se);
         assert(filename);
 
-        return run_script(se, luaL_loadfile, filename, wait_func, wait_data);
+        return run_script(se, luaL_loadfile, filename, run_func, run_data);
 }
 
 static int load_prelude(struct callbacks *cb, lua_State *L)
