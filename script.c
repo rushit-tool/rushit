@@ -309,12 +309,12 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
 
 static int run_script(struct script_engine *se,
                       int (*load_func)(lua_State *, const char *), const char *input,
-                      void (*wait_func)(void *data), void *wait_data)
+                      void (*run_func)(void *data), void *run_data)
 {
         int err;
 
-        se->wait_func = wait_func;
-        se->wait_data = wait_data;
+        se->run_func = run_func;
+        se->run_data = run_data;
 
         err = (*load_func)(se->L, input);
         if (err) {
@@ -327,9 +327,6 @@ static int run_script(struct script_engine *se,
                 return -errno_lua(err);
         }
 
-        if (wait_func)
-                (*wait_func)(wait_data);
-
         /* TODO: Propagate return value. */
         return 0;
 }
@@ -339,24 +336,24 @@ static int run_script(struct script_engine *se,
  * Runs the script passed in a string.
  */
 int script_engine_run_string(struct script_engine *se, const char *script,
-                             void (*wait_func)(void *), void *wait_data)
+                             void (*run_func)(void *), void *run_data)
 {
         assert(se);
         assert(script);
 
-        return run_script(se, luaL_loadstring, script, wait_func, wait_data);
+        return run_script(se, luaL_loadstring, script, run_func, run_data);
 }
 
 /**
  * Runs the script from a given file.
  */
 int script_engine_run_file(struct script_engine *se, const char *filename,
-                            void (*wait_func)(void *), void *wait_data)
+                            void (*run_func)(void *), void *run_data)
 {
         assert(se);
         assert(filename);
 
-        return run_script(se, luaL_loadfile, filename, wait_func, wait_data);
+        return run_script(se, luaL_loadfile, filename, run_func, run_data);
 }
 
 static int load_prelude(struct callbacks *cb, lua_State *L)
