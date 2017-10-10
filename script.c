@@ -114,6 +114,19 @@ static int store_hook_bytecode(struct script_engine *se, enum script_hook_id hid
         return 0;
 }
 
+static struct script_engine *get_context(lua_State *L)
+{
+        struct script_engine *se;
+
+        lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
+        lua_gettable(L, LUA_REGISTRYINDEX);
+        se = lua_touserdata(L, -1);
+        assert(se);
+        lua_pop(L, 1);
+
+        return se;
+}
+
 static int store_hook(lua_State *L, enum run_mode run_mode,
                       enum script_hook_id hid)
 {
@@ -123,14 +136,7 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
         /* Expect a function argument */
         luaL_checktype(L, 1, LUA_TFUNCTION);
 
-        /* Get context */
-        lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
-        lua_gettable(L, LUA_REGISTRYINDEX);
-        se = lua_touserdata(L, -1);
-        lua_pop(L, 1);
-
-        assert(se);
-
+        se = get_context(L);
         if (se->run_mode == run_mode)
                rc = store_hook_bytecode(se, hid);
 
