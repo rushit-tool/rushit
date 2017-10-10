@@ -203,6 +203,19 @@ static int is_server_cb(lua_State *L)
         return 0;
 }
 
+static int run_cb(lua_State *L)
+{
+        struct script_engine *se;
+
+        se = get_context(L);
+        if (se->run_func) {
+                (*se->run_func)(se->run_data);
+                se->run_func = NULL; /* runs only once */
+        }
+
+        return 0;
+}
+
 static int tid_iter_cb(lua_State *L)
 {
         return 0;
@@ -229,6 +242,7 @@ static const struct luaL_Reg server_callbacks[] = {
 static const struct luaL_Reg common_callbacks[] = {
         { "is_client", is_client_cb },
         { "is_server", is_server_cb },
+        { "run",       run_cb },
         { "tid_iter",  tid_iter_cb },
         { NULL, NULL },
 };
@@ -326,6 +340,9 @@ static int run_script(struct script_engine *se,
                 LOG_ERROR(se->cb, "lua_pcall: %s", lua_tostring(se->L, -1));
                 return -errno_lua(err);
         }
+
+        /* If run() hasn't been called from the script, do it now */
+        run_cb(se->L);
 
         /* TODO: Propagate return value. */
         return 0;

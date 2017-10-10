@@ -174,6 +174,31 @@ static void t_wait_func_gets_called(void **state)
         assert_true(wait_done);
 }
 
+static void toggle_flag(void *flag_)
+{
+        bool *flag = flag_;
+        *flag = !*flag;
+}
+
+static void t_run_cb_gets_invoked(void **state)
+{
+        struct script_engine *se = *state;
+        bool done;
+        int r;
+
+        /* explicit invocation from script */
+        done = false;
+        r = script_engine_run_string(se, "run()", toggle_flag, &done);
+        assert_return_code(r, -r);
+        assert_true(done);
+
+        /* implicit invocation by engine */
+        done = false;
+        r = script_engine_run_string(se, "", toggle_flag, &done);
+        assert_return_code(r, -r);
+        assert_true(done);
+}
+
 static void t_run_socket_hook_from_string(void **state)
 {
         const char *script = "client_socket( function () return 42 end )";
@@ -373,6 +398,7 @@ int main(void)
                 cmocka_unit_test(t_create_script_slave),
                 clinet_engine_unit_test(t_hooks_run_without_errors),
                 clinet_engine_unit_test(t_wait_func_gets_called),
+                clinet_engine_unit_test(t_run_cb_gets_invoked),
                 client_slave_unit_test(t_run_socket_hook_from_string),
                 client_slave_unit_test(t_run_socket_hook_from_file),
                 client_slave_unit_test(t_run_close_hook),
