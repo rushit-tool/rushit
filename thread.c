@@ -200,8 +200,9 @@ static void free_worker_threads(int num_threads, struct thread *t)
         free(t);
 }
 
-static void run_worker_threads(struct main_context *ctx)
+static void run_worker_threads(void *ctx_)
 {
+        struct main_context *ctx = ctx_;
         struct callbacks *cb = ctx->cb;
         struct options *opts = ctx->opts;
         struct rusage_interval *rui = &ctx->rusage_ival;
@@ -292,12 +293,14 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
         free(ai);
 
         if (opts->script) {
-                r = script_engine_run_file(se, opts->script, NULL, NULL);
+                r = script_engine_run_file(se, opts->script,
+                                           run_worker_threads, ctx);
                 if (r < 0)
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
+        } else {
+                run_worker_threads(ctx);
         }
-        run_worker_threads(ctx);
 
         r = pthread_barrier_destroy(ready);
         if (r != 0)

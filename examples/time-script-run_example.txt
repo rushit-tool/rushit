@@ -1,0 +1,15 @@
+Example of triggering the test run from the script.
+
+~/src/rushit $ cat -n examples/time-script-run.lua
+     1  local t_start = os.time()
+     2
+     3  run()
+     4
+     5  local t_diff = os.time() - t_start
+     6  io.stderr:write('Script ran for ' .. t_diff .. ' seconds.\n')
+~/src/rushit $ ./tcp_stream > /dev/null &
+[2] 12063
+~/src/rushit $ ./tcp_stream --client --test-length 7 --script examples/time-script-run.lua > /dev/null
+Script ran for 7 seconds.
+[2]+  Done                    ./tcp_stream > /dev/null
+~/src/rushit $
