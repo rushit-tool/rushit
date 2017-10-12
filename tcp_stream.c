@@ -146,7 +146,7 @@ write_again:
         }
 }
 
-static void client_connect(int flow_id, int epfd, struct thread *t)
+static int client_connect(int flow_id, int epfd, struct thread *t)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
@@ -156,8 +156,11 @@ static void client_connect(int flow_id, int epfd, struct thread *t)
         int fd;
 
         fd = do_socket_open(ss, ai);
-        if (fd == -1)
+        if (fd == -1) {
                 PLOG_FATAL(cb, "socket");
+                return fd;
+        }
+
         if (opts->min_rto)
                 set_min_rto(fd, opts->min_rto, cb);
         if (opts->debug)
@@ -170,6 +173,8 @@ static void client_connect(int flow_id, int epfd, struct thread *t)
         flow = addflow(t->index, epfd, fd, flow_id, epoll_events(opts), opts,
                        cb);
         flow->itv = interval_create(opts->interval, t);
+
+        return fd;
 }
 
 static void run_client(struct thread *t)
@@ -185,6 +190,11 @@ static void run_client(struct thread *t)
         struct flow *stop_fl;
         int epfd, i;
         char *buf;
+        CLEANUP(free) int *client_fds = NULL;
+
+        client_fds = calloc(flows_in_this_thread, sizeof(int));
+        if (!client_fds)
+                PLOG_FATAL(cb, "alloc client_fds array");
 
         LOG_INFO(cb, "flows_in_this_thread=%d", flows_in_this_thread);
         epfd = epoll_create1(0);
@@ -193,7 +203,7 @@ static void run_client(struct thread *t)
         LOG_INFO(cb, "t->stop_efd=%d", t->stop_efd);
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         for (i = 0; i < flows_in_this_thread; i++)
-                client_connect(i, epfd, t);
+                client_fds[i] = client_connect(i, epfd, t);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
         buf = malloc(opts->buffer_size);
         if (!buf)
@@ -212,9 +222,8 @@ static void run_client(struct thread *t)
                 process_events(t, epfd, events, nfds, -1, buf);
         }
 
-        /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
         for (i = 0; i < flows_in_this_thread; i++) {
-                if (do_socket_close(ss, -1, ai) < 0)
+                if (do_socket_close(ss, client_fds[i], ai) < 0)
                         /* PLOG_FATAL(cb, "close"); */
                         /* XXX: ignore errors */ ;
         }
