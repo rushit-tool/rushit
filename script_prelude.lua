@@ -13,15 +13,7 @@ struct addrinfo {
         char            *ai_canonname;
         struct addrinfo *ai_next;
 };
-
-struct scm_timestamping {
-        struct timespec ts[3];
-};
 ]]
-
-scm_timestamping = function(ptr)
-  return F.cast(F.typeof("struct scm_timestamping *"), ptr)
-end
 
 --
 -- Constants
@@ -195,9 +187,11 @@ SOF_TIMESTAMPING_OPT_TX_SWHW  = C.SOF.TIMESTAMPING_OPT_TX_SWHW
 --
 -- Types
 --
-local T = S.t
+local T = S.types.t
+local PT = S.types.pt
 
 sockaddr_in = T.sockaddr_in
+scm_timestamping = PT.scm_timestamping
 
 --
 -- Functions
