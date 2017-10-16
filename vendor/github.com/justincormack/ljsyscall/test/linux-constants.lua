@@ -167,6 +167,9 @@ local function fixup_constants(abi, c)
   c.SO.DETACH_BPF = nil
   c.SO.ATTACH_REUSEPORT_CBPF = nil
   c.SO.ATTACH_REUSEPORT_EBPF = nil
+  c.F_SEAL = nil
+  c.F.ADD_SEALS = nil
+  c.F.GET_SEALS = nil
 
   -- these are not even in linux git head headers or names wrong
   c.O.ASYNC = nil
@@ -247,6 +250,24 @@ local function fixup_constants(abi, c)
   c.PERF_SAMPLE_BRANCH = {}
   c.PERF_READ_FORMAT = {}
   c.PERF_RECORD = {}
+
+  c.SOF.TIMESTAMPING_LAST = nil
+  c.SOF.TIMESTAMPING_MASK = nil
+  c.SOF.TIMESTAMPING_OPT_CMSG = nil
+  c.SOF.TIMESTAMPING_OPT_ID = nil
+  c.SOF.TIMESTAMPING_OPT_PKTINFO = nil
+  c.SOF.TIMESTAMPING_OPT_STATS = nil
+  c.SOF.TIMESTAMPING_OPT_TSONLY = nil
+  c.SOF.TIMESTAMPING_OPT_TX_SWHW = nil
+  c.SOF.TIMESTAMPING_RAW_HARDWARE = nil
+  c.SOF.TIMESTAMPING_RX_HARDWARE = nil
+  c.SOF.TIMESTAMPING_RX_SOFTWARE = nil
+  c.SOF.TIMESTAMPING_SOFTWARE = nil
+  c.SOF.TIMESTAMPING_SYS_HARDWARE = nil
+  c.SOF.TIMESTAMPING_TX_ACK = nil
+  c.SOF.TIMESTAMPING_TX_HARDWARE = nil
+  c.SOF.TIMESTAMPING_TX_SCHED = nil
+  c.SOF.TIMESTAMPING_TX_SOFTWARE = nil
 
   return c
 end

@@ -7,12 +7,8 @@ Note a fair number are being deprecated, see include/uapi/asm-generic/unistd.h u
 Some of these we already don't use, but some we do, eg use open not openat etc.
 ]]
 
-local require, error, assert, tonumber, tostring,
-setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, select = 
-require, error, assert, tonumber, tostring,
-setmetatable, pairs, ipairs, unpack, rawget, rawset,
-pcall, type, table, string, select
+local require, tonumber, pcall, select =
+require, tonumber, pcall, select
 
 local abi = require "syscall.abi"
 
@@ -34,7 +30,6 @@ local uint, ulong = ffi.typeof("unsigned int"), ffi.typeof("unsigned long")
 
 local h = require "syscall.helpers"
 local err64 = h.err64
-local errpointer = h.errpointer
 
 local i6432, u6432 = bit.i6432, bit.u6432
 
@@ -53,7 +48,6 @@ else
   arg64u = function(val) return u6432(val) end
 end
 -- _llseek very odd, preadv
-local function llarg64u(val) return u6432(val) end
 local function llarg64(val) return i6432(val) end
 
 local C = {}
@@ -69,7 +63,6 @@ local u64 = ffi.typeof("uint64_t")
 -- TODO could make these return errno here, also are these best casts?
 local syscall_long = ffi.C.syscall -- returns long
 local function syscall(...) return tonumber(syscall_long(...)) end -- int is default as most common
-local function syscall_uint(...) return uint(syscall_long(...)) end
 local function syscall_void(...) return void(syscall_long(...)) end
 local function syscall_off(...) return u64(syscall_long(...)) end -- off_t
 
@@ -182,6 +175,7 @@ end
 
 -- glibc caches pid, but this fails to work eg after clone().
 function C.getpid() return syscall(sys.getpid) end
+function C.gettid() return syscall(sys.gettid) end
 
 -- underlying syscalls
 function C.exit_group(status) return syscall(sys.exit_group, int(status)) end -- void return really
@@ -685,7 +679,7 @@ C.gettimeofday = ffi.C.gettimeofday
 --function C.gettimeofday(tv, tz) return syscall(sys.gettimeofday, void(tv), void(tz)) end
 
 -- glibc does not provide getcpu; it is however VDSO
-function C.getcpu(cpu, node, tcache) return syscall(sys.getcpu, void(node), void(node), void(tcache)) end
+function C.getcpu(cpu, node, tcache) return syscall(sys.getcpu, void(cpu), void(node), void(tcache)) end
 -- time is VDSO but not really performance critical; does not exist for some architectures
 if sys.time then
   function C.time(t) return syscall(sys.time, void(t)) end

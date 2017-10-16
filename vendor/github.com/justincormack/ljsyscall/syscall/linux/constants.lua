@@ -161,9 +161,12 @@ c.F = strflag(arch.F or {
   SETLEASE    = 1024,
   GETLEASE    = 1025,
   NOTIFY      = 1026,
+  CANCELLK    = 1029,
+  DUPFD_CLOEXEC = 1030,
   SETPIPE_SZ  = 1031,
   GETPIPE_SZ  = 1032,
-  DUPFD_CLOEXEC = 1030,
+  ADD_SEALS   = 1033,
+  GET_SEALS   = 1034,
 })
 
 -- messy
@@ -206,6 +209,14 @@ c.LOCK = multiflags {
   READ      = 64,
   WRITE     = 128,
   RW        = 192,
+}
+
+-- for memfd
+c.F_SEAL = multiflags {
+  SEAL     = 0x0001,
+  SHRINK   = 0x0002,
+  GROW     = 0x0004,
+  WRITE    = 0x0008,
 }
 
 --mmap
@@ -300,6 +311,8 @@ c.SEEK = strflag {
   SET = 0,
   CUR = 1,
   END = 2,
+  DATA = 3,
+  HOLE = 4,
 }
 
 -- exit
@@ -2113,15 +2126,20 @@ c.BPF = multiflags {
   EXIST      = 2,
 }
 
--- eBPF flags
+-- BPF map type
 c.BPF_MAP = strflag {
   UNSPEC           = 0,
   HASH             = 1,
   ARRAY            = 2,
   PROG_ARRAY       = 3,
   PERF_EVENT_ARRAY = 4,
+  PERCPU_HASH      = 5,
+  PERCPU_ARRAY     = 6,
+  STACK_TRACE      = 7,
+  CGROUP_ARRAY     = 8,
 }
 
+-- BPF syscall commands
 c.BPF_CMD = strflag {
   MAP_CREATE       = 0,
   MAP_LOOKUP_ELEM  = 1,
@@ -2133,12 +2151,15 @@ c.BPF_CMD = strflag {
   OBJ_GET          = 7,
 }
 
+-- BPF program types
 c.BPF_PROG = strflag {
   UNSPEC        = 0,
   SOCKET_FILTER = 1,
   KPROBE        = 2,
   SCHED_CLS     = 3,
   SCHED_ACT     = 4,
+  TRACEPOINT    = 5,
+  XDP           = 6,
 }
 
 -- Linux performance monitoring
