@@ -2,7 +2,7 @@
 
 local function init(S)
 
-local helpers = require "syscall.helpers"
+local helpers = require "test.helpers"
 local abi = S.abi
 local types = S.types
 local c = S.c
@@ -348,9 +348,12 @@ test.misc_linux = {
   end,
   test_memfd = function()
     if not S.memfd_create then error "skipped" end
-    local fd, err = S.memfd_create("", "cloexec")
+    local fd, err = S.memfd_create("", "cloexec, allow_sealing")
     if not fd and err.NOSYS then error "skipped" end
     assert(fd, err)
+    local seals = assert(fd:fcntl("get_seals"))
+    assert(seals == 0)
+    assert(fd:fcntl("add_seals", "shrink, grow, write, seal"))
     assert(fd:close())
   end,
 }
@@ -1921,6 +1924,9 @@ test.processes_linux = {
       assert(status.WIFEXITED, "process should have exited normally")
       assert(status.EXITSTATUS == 23, "exit should be 23")
     end
+  end,
+  test_tid = function()
+     assert(S.getpid() == S.gettid(), "PID should be the same as TID")
   end,
 }
 test.scheduler = {
