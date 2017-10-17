@@ -24,7 +24,7 @@ struct addrinfo;
 struct msghdr;
 
 struct lua_State;
-struct Lstring;
+struct l_string;
 
 /* Stay out of errno range */
 #define SCRIPT_HOOK_ERROR_BASE (1 << 8)
@@ -55,7 +55,7 @@ enum script_hook_id {
 
 struct script_hook {
         const char *name;
-        struct Lstring *bytecode;
+        struct l_string *bytecode;
 };
 
 struct script_engine {

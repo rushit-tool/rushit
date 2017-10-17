@@ -41,14 +41,14 @@ static void script_engine_set_hook(struct script_engine *se,
 
 DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
 
-struct Lstring {
+struct l_string {
         char *data;
         size_t len;
 };
 
-static struct Lstring *Lstring_new(const char *data, size_t len)
+static struct l_string *l_string_new(const char *data, size_t len)
 {
-        struct Lstring *s;
+        struct l_string *s;
 
         assert(data);
 
@@ -61,7 +61,7 @@ static struct Lstring *Lstring_new(const char *data, size_t len)
         return s;
 }
 
-static void Lstring_free(struct Lstring *s)
+static void l_string_free(struct l_string *s)
 {
         free(s);
 }
@@ -315,7 +315,7 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         se->L = NULL;
 
         for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++)
-                Lstring_free(h->bytecode);
+                l_string_free(h->bytecode);
 
         free(se);
         return NULL;
@@ -470,8 +470,8 @@ static void script_engine_set_hook(struct script_engine *se,
         h = &se->hooks[hid];
         h->name = get_hook_name(se->run_mode, hid);
         if (h->bytecode)
-                Lstring_free(h->bytecode);
-        h->bytecode = Lstring_new(bytecode, bytecode_len);
+                l_string_free(h->bytecode);
+        h->bytecode = l_string_new(bytecode, bytecode_len);
 }
 
 /**
