@@ -458,6 +458,16 @@ static struct script_hook *script_engine_put_hook(struct script_hook *hook)
 }
 DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
 
+static void hook_set_bytecode(struct script_hook *h, const char *bytecode,
+                              size_t bytecode_len)
+{
+        assert(h);
+
+        if (h->bytecode)
+                l_string_free(h->bytecode);
+        h->bytecode = l_string_new(bytecode, bytecode_len);
+}
+
 static void script_engine_set_hook(struct script_engine *se,
                                    enum script_hook_id hid,
                                    const char *bytecode, size_t bytecode_len)
@@ -469,9 +479,7 @@ static void script_engine_set_hook(struct script_engine *se,
 
         h = &se->hooks[hid];
         h->name = get_hook_name(se->run_mode, hid);
-        if (h->bytecode)
-                l_string_free(h->bytecode);
-        h->bytecode = l_string_new(bytecode, bytecode_len);
+        hook_set_bytecode(h, bytecode, bytecode_len);
 }
 
 /**
