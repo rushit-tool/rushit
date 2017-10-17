@@ -35,10 +35,6 @@ enum run_mode { CLIENT, SERVER };
  */
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
-static void script_engine_set_hook(struct script_engine *se,
-                                   enum script_hook_id hid,
-                                   const char *bytecode, size_t length);
-
 DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
 
 struct l_string {
@@ -84,8 +80,33 @@ static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
         return 0;
 }
 
+static struct script_hook *script_engine_get_hook(struct script_engine *se,
+                                                  enum script_hook_id hid)
+{
+        assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
+
+        return &se->hooks[hid];
+}
+
+static struct script_hook *script_engine_put_hook(struct script_hook *hook)
+{
+        return NULL;
+}
+DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
+
+static void hook_set_bytecode(struct script_hook *h, const char *bytecode,
+                              size_t bytecode_len)
+{
+        assert(h);
+
+        if (h->bytecode)
+                l_string_free(h->bytecode);
+        h->bytecode = l_string_new(bytecode, bytecode_len);
+}
+
 static int store_hook_bytecode(struct script_engine *se, enum script_hook_id hid)
 {
+        CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         lua_State *L = se->L;
         const char *buf;
         size_t len = 0;
@@ -102,7 +123,8 @@ static int store_hook_bytecode(struct script_engine *se, enum script_hook_id hid
         if (!buf || !len)
                 LOG_FATAL(se->cb, "lua_dump returned an empty buffer");
 
-        script_engine_set_hook(se, hid, buf, len);
+        h = script_engine_get_hook(se, hid);
+        hook_set_bytecode(h, buf, len);
 
         buf = NULL;
         len = 0;
@@ -449,43 +471,6 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
 
         free(ss);
         return NULL;
-}
-
-static struct script_hook *script_engine_get_hook(struct script_engine *se,
-                                                  enum script_hook_id hid)
-{
-        assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
-
-        return &se->hooks[hid];
-}
-
-static struct script_hook *script_engine_put_hook(struct script_hook *hook)
-{
-        return NULL;
-}
-DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
-
-static void hook_set_bytecode(struct script_hook *h, const char *bytecode,
-                              size_t bytecode_len)
-{
-        assert(h);
-
-        if (h->bytecode)
-                l_string_free(h->bytecode);
-        h->bytecode = l_string_new(bytecode, bytecode_len);
-}
-
-static void script_engine_set_hook(struct script_engine *se,
-                                   enum script_hook_id hid,
-                                   const char *bytecode, size_t bytecode_len)
-{
-        CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
-
-        assert(se);
-        assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
-
-        h = script_engine_get_hook(se, hid);
-        hook_set_bytecode(h, bytecode, bytecode_len);
 }
 
 /**
