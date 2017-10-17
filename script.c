@@ -257,6 +257,14 @@ static const char *get_hook_name(enum run_mode mode, enum script_hook_id hid)
         return hook_names[mode][hid].name;
 }
 
+static void init_hook_names(struct script_engine *se)
+{
+        int hid;
+
+        for (hid = 0; hid < SCRIPT_HOOK_MAX; hid++)
+                se->hooks[hid].name = get_hook_name(se->run_mode, hid);
+}
+
 /**
  * Create an instance of a script engine
  */
@@ -295,6 +303,8 @@ int script_engine_create(struct script_engine **sep, struct callbacks *cb,
         se->L = L;
         se->cb = cb;
         se->run_mode = is_client ? CLIENT : SERVER;
+
+        init_hook_names(se);
 
         *sep = se;
         se = NULL;
@@ -478,7 +488,6 @@ static void script_engine_set_hook(struct script_engine *se,
         assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
 
         h = &se->hooks[hid];
-        h->name = get_hook_name(se->run_mode, hid);
         hook_set_bytecode(h, bytecode, bytecode_len);
 }
 
