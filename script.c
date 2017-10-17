@@ -104,9 +104,9 @@ static void hook_set_bytecode(struct script_hook *h, const char *bytecode,
         h->bytecode = l_string_new(bytecode, bytecode_len);
 }
 
-static int store_hook_bytecode(struct script_engine *se, enum script_hook_id hid)
+static int store_hook_bytecode(struct script_engine *se,
+                               struct script_hook *hook)
 {
-        CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         lua_State *L = se->L;
         const char *buf;
         size_t len = 0;
@@ -123,8 +123,7 @@ static int store_hook_bytecode(struct script_engine *se, enum script_hook_id hid
         if (!buf || !len)
                 LOG_FATAL(se->cb, "lua_dump returned an empty buffer");
 
-        h = script_engine_get_hook(se, hid);
-        hook_set_bytecode(h, buf, len);
+        hook_set_bytecode(hook, buf, len);
 
         buf = NULL;
         len = 0;
@@ -152,6 +151,7 @@ static struct script_engine *get_context(lua_State *L)
 static int store_hook(lua_State *L, enum run_mode run_mode,
                       enum script_hook_id hid)
 {
+        CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         struct script_engine *se;
         int rc = 0;
 
@@ -159,8 +159,10 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
         luaL_checktype(L, 1, LUA_TFUNCTION);
 
         se = get_context(L);
-        if (se->run_mode == run_mode)
-               rc = store_hook_bytecode(se, hid);
+        if (se->run_mode == run_mode) {
+                h = script_engine_get_hook(se, hid);
+                rc = store_hook_bytecode(se, h);
+        }
 
         return rc;
 }
