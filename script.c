@@ -479,12 +479,12 @@ static void script_engine_set_hook(struct script_engine *se,
                                    enum script_hook_id hid,
                                    const char *bytecode, size_t bytecode_len)
 {
-        struct script_hook *h;
+        CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
 
         assert(se);
         assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
 
-        h = &se->hooks[hid];
+        h = script_engine_get_hook(se, hid);
         hook_set_bytecode(h, bytecode, bytecode_len);
 }
 
