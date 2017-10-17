@@ -454,12 +454,9 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
 static struct script_hook *script_engine_get_hook(struct script_engine *se,
                                                   enum script_hook_id hid)
 {
-        struct script_hook *h;
-
         assert(0 <= hid && hid < SCRIPT_HOOK_MAX);
 
-        h = &se->hooks[hid];
-        return h->bytecode ? h : NULL;
+        return &se->hooks[hid];
 }
 
 static struct script_hook *script_engine_put_hook(struct script_hook *hook)
@@ -545,7 +542,7 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
         int err;
 
         h = script_engine_get_hook(ss->se, hid);
-        if (!h)
+        if (!h->bytecode)
                 return -EHOOKEMPTY;
 
         err = luaL_loadbuffer(ss->L, h->bytecode->data, h->bytecode->len, h->name);
