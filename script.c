@@ -104,10 +104,9 @@ static void hook_set_bytecode(struct script_hook *h, const char *bytecode,
         h->bytecode = l_string_new(bytecode, bytecode_len);
 }
 
-static int store_hook_bytecode(struct script_engine *se,
+static int store_hook_bytecode(struct callbacks *cb, lua_State *L,
                                struct script_hook *hook)
 {
-        lua_State *L = se->L;
         const char *buf;
         size_t len = 0;
         luaL_Buffer B;
@@ -117,11 +116,11 @@ static int store_hook_bytecode(struct script_engine *se,
         luaL_buffinit(L, &B);
         err = lua_dump(L, string_writer, &B);
         if (err)
-                LOG_FATAL(se->cb, "lua_dump: %s", lua_tostring(L, -1));
+                LOG_FATAL(cb, "lua_dump: %s", lua_tostring(L, -1));
         luaL_pushresult(&B);
         buf = lua_tolstring(L, -1, &len);
         if (!buf || !len)
-                LOG_FATAL(se->cb, "lua_dump returned an empty buffer");
+                LOG_FATAL(cb, "lua_dump returned an empty buffer");
 
         hook_set_bytecode(hook, buf, len);
 
@@ -161,7 +160,7 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
         se = get_context(L);
         if (se->run_mode == run_mode) {
                 h = script_engine_get_hook(se, hid);
-                rc = store_hook_bytecode(se, h);
+                rc = store_hook_bytecode(se->cb, L, h);
         }
 
         return rc;
