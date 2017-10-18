@@ -291,10 +291,15 @@ static void t_run_recverr_hook(void **state)
         assert_int_equal(r, 7193);
 }
 
-#define lua_assert(expr, op, val) \
-        "assert(" #expr #op #val ", 'expected " #expr " to be " #val ", got ' .. tostring(" #expr "));"
+#define lua_assert(expr, op, val) lua_assert_(#expr, #op, #val)
+#define lua_assert_(expr, op, val) \
+        "assert(" expr op val ", \"expected " expr " to be " val ", got \" .. tostring(" expr "));"
+
 #define lua_assert_equal(expr, val) lua_assert(expr, ==, val)
 #define lua_assert_not_equal(expr, val) lua_assert(expr, ~=, val)
+
+#define lua_assert_true(expr) lua_assert_(#expr, "==", "true")
+#define lua_assert_false(expr) lua_assert_(#expr, "==", "false")
 
 static void t_pass_args_to_socket_hook(void **state)
 {
@@ -386,6 +391,47 @@ static void t_pass_args_to_packet_hook(void **state)
         assert_int_equal(r, 0);
 }
 
+static void t_run_hook_with_one_primitive_upvalue(void **state)
+{
+        const char *script[] = {
+                /* boolean */
+                "local flag = true;"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_true(flag)
+                "    return 0;"
+                "  end"
+                ")",
+                /* number */
+                "local number = 42;"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(number, 42)
+                "    return 0;"
+                "  end"
+                ")",
+                /* string */
+                "local string = 'foo';"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(string, 'foo')
+                "    return 0;"
+                "  end"
+                ")",
+        };
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int i, r;
+
+        for (i = 0; i < ARRAY_SIZE(script); i++) {
+                r = script_engine_run_string(se, script[i], NULL, NULL);
+                assert_return_code(r, -r);
+
+                r = script_slave_socket_hook(ss, -1, NULL);
+                assert_return_code(r, -r);
+        }
+}
+
 #define clinet_engine_unit_test(f) \
         cmocka_unit_test_setup_teardown((f), client_engine_setup, client_engine_teardown)
 #define client_slave_unit_test(f) \
@@ -407,6 +453,7 @@ int main(void)
                 client_slave_unit_test(t_run_recverr_hook),
                 client_slave_unit_test(t_pass_args_to_socket_hook),
                 client_slave_unit_test(t_pass_args_to_packet_hook),
+                client_slave_unit_test(t_run_hook_with_one_primitive_upvalue),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);
