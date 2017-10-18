@@ -37,6 +37,11 @@ static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
 
+static void assert_lua_stack_is_empty(lua_State *L)
+{
+        assert(lua_gettop(L) == 0);
+}
+
 struct l_string {
         char *data;
         size_t len;
@@ -710,17 +715,21 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         struct l_upvalue *v;
-        int err;
+        int err, hook_idx;
 
         h = script_engine_get_hook(ss->se, hid);
         if (!h->bytecode)
                 return -EHOOKEMPTY;
 
+        assert_lua_stack_is_empty(ss->L);
+        hook_idx = 1;
+
         err = load_function_bytecode(ss->cb, ss->L, h->bytecode, h->name);
         if (err)
                 return err;
+
         for (v = h->upvalues; v; v = v->next)
-                push_upvalue(ss->cb, ss->L, 1, v);
+                push_upvalue(ss->cb, ss->L, hook_idx, v);
         /* TODO: Push globals */
 
         return 0;
