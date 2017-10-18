@@ -295,6 +295,9 @@ static void t_run_recverr_hook(void **state)
 #define lua_assert_(expr, op, val) \
         "assert(" expr op val ", \"expected " expr " to be " val ", got \" .. tostring(" expr "));"
 
+#define lua_assert_nil(expr) lua_assert(expr, ==, nil)
+#define lua_assert_not_nil(expr) lua_assert(expr, ~=, nil)
+
 #define lua_assert_equal(expr, val) lua_assert(expr, ==, val)
 #define lua_assert_not_equal(expr, val) lua_assert(expr, ~=, val)
 
@@ -457,6 +460,28 @@ static void t_run_hook_with_multiple_upvalues(void **state)
         assert_return_code(r, -r);
 }
 
+static void t_run_hook_with_function_upvalue(void **state)
+{
+        const char *script =
+                "local function func () return true; end;"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_not_nil(func)
+                "    " lua_assert_true(func())
+                "    return 0;"
+                "  end"
+                ")";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
 #define clinet_engine_unit_test(f) \
         cmocka_unit_test_setup_teardown((f), client_engine_setup, client_engine_teardown)
 #define client_slave_unit_test(f) \
@@ -480,6 +505,7 @@ int main(void)
                 client_slave_unit_test(t_pass_args_to_packet_hook),
                 client_slave_unit_test(t_run_hook_with_one_primitive_upvalue),
                 client_slave_unit_test(t_run_hook_with_multiple_upvalues),
+                client_slave_unit_test(t_run_hook_with_function_upvalue),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);
