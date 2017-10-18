@@ -65,20 +65,20 @@ client_recverr(
   end
 )
 
+local function bar(val, max, width)
+  if max == 0 then return "" end
+
+  local s = ""
+  local i = 0
+  while i < (width * val / max) do
+    s = s .. "="
+    i = i + 1
+  end
+  return s
+end
+
 client_close(
   function (sockfd)
-    function bar(val, max, width)
-      if max == 0 then return "" end
-
-      local s = ""
-      local i = 0
-      while i < (width * val / max) do
-        s = s .. "="
-        i = i + 1
-      end
-      return s
-    end
-
     local max = 0
     for _, v in ipairs(hist) do
       if v > max then max = v end
