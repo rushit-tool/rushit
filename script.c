@@ -148,7 +148,9 @@ static struct script_engine *get_context(lua_State *L)
 }
 
 struct l_upvalue {
-        char *name;
+        struct l_upvalue *next;
+
+        int index;
         int type;
         union {
                 bool boolean;
@@ -157,20 +159,15 @@ struct l_upvalue {
         };
 };
 
-static struct l_upvalue *l_upvalue_new(int type, const char *name)
+static struct l_upvalue *l_upvalue_new(int index, int type)
 {
         struct l_upvalue *v;
-        size_t len;
 
-        assert(name);
-
-        len = strlen(name);
-        v = calloc(1, sizeof(*v) + len + 1);
+        v = calloc(1, sizeof(*v));
         assert(v);
 
+        v->index = index;
         v->type = type;
-        v->name = (void *) (v + 1);
-        memcpy(v->name, name, len);
 
         return v;
 }
@@ -188,13 +185,13 @@ static void l_upvalue_free(struct l_upvalue *v)
         free(v);
 }
 
-static struct l_upvalue *serialize_upvalue(lua_State *L, const char *name)
+static struct l_upvalue *serialize_upvalue(lua_State *L, int index)
 {
         struct l_upvalue *v;
         int type;
 
         type = lua_type(L, -1);
-        v = l_upvalue_new(type, name);
+        v = l_upvalue_new(index, type);
 
         switch (type) {
         case LUA_TNIL:
@@ -231,15 +228,44 @@ static struct l_upvalue *serialize_upvalue(lua_State *L, const char *name)
         return v;
 }
 
-static void store_hook_upvalue(struct lua_State *L, struct script_hook *hook)
+static void hook_set_upvalue(struct script_hook *hook,
+                             struct l_upvalue *upvalue)
 {
+        assert(hook);
+        assert(upvalue);
+
+        upvalue->next = hook->upvalues;
+        hook->upvalues = upvalue;
+}
+
+static void hook_unset_upvalues(struct script_hook *hook)
+{
+        struct l_upvalue *v, *v_next;
+
+        v = hook->upvalues;
+        while (v) {
+                v_next = v->next;
+                l_upvalue_free(v);
+                v = v_next;
+        }
+
+        hook->upvalues = NULL;
+}
+
+static void store_hook_upvalues(struct lua_State *L, struct script_hook *hook)
+{
+        struct l_upvalue *upval;
         const char *name;
-        int top;
+        int i, top;
+
+        assert(hook);
+
+        hook_unset_upvalues(hook);
 
         top = lua_gettop(L);
-        name = lua_getupvalue(L, top, 1);
-        if (name) {
-                hook->upvalue = serialize_upvalue(L, name);
+        for (i = 1; (name = lua_getupvalue(L, top, i)); i++) {
+                upval = serialize_upvalue(L, i);
+                hook_set_upvalue(hook, upval);
                 lua_pop(L, 1);
         }
 }
@@ -257,7 +283,7 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
         se = get_context(L);
         if (se->run_mode == run_mode) {
                 h = script_engine_get_hook(se, hid);
-                store_hook_upvalue(L, h);
+                store_hook_upvalues(L, h);
                 rc = store_hook_bytecode(se->cb, L, h);
         }
 
@@ -447,7 +473,7 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
 
         for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++) {
                 l_string_free(h->bytecode);
-                l_upvalue_free(h->upvalue);
+                hook_unset_upvalues(h);
         }
 
         free(se);
@@ -622,7 +648,7 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         return  0;
 }
 
-static void push_upvalue(lua_State *L, struct l_upvalue *upvalue)
+static void push_upvalue(lua_State *L, int func_index, struct l_upvalue *upvalue)
 {
         const char *n;
 
@@ -641,13 +667,14 @@ static void push_upvalue(lua_State *L, struct l_upvalue *upvalue)
                 break;
         }
 
-        n = lua_setupvalue(L, 1, 1);
+        n = lua_setupvalue(L, func_index, upvalue->index);
         assert(n);
 }
 
 static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
+        struct l_upvalue *v;
         int err;
 
         h = script_engine_get_hook(ss->se, hid);
@@ -660,9 +687,8 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
                           h->name, lua_tostring(ss->L, -1));
                 return -errno_lua(err);
         }
-        /* TODO: Push upvalues */
-        if (h->upvalue)
-                push_upvalue(ss->L, h->upvalue);
+        for (v = h->upvalues; v; v = v->next)
+                push_upvalue(ss->L, 1, v);
         /* TODO: Push globals */
 
         return 0;
