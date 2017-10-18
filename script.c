@@ -738,11 +738,12 @@ static int call_hook(struct script_slave *ss, enum script_hook_id hid, int nargs
                 return -errno_lua(err);
         }
 
-        if (lua_isnil(ss->L, -1))
-                return -EHOOKRETVAL;
-
-        res = luaL_checkint(ss->L, -1);
+        if (lua_isnumber(ss->L, -1))
+                res = lua_tointeger(ss->L, -1);
+        else
+                res = -EHOOKRETVAL;
         lua_pop(ss->L, 1);
+
         return res;
 }
 
