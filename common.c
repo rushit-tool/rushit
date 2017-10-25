@@ -59,6 +59,26 @@ static inline const char *strnull(const char *s)
         return s ? s : "(null)";
 }
 
+struct byte_array *byte_array_new(const uint8_t *data, size_t len)
+{
+        struct byte_array *a;
+
+        assert(data);
+
+        a = calloc(1, sizeof(*a) + len + 1);
+        assert(a);
+        a->data = (void *) (a + 1);
+        a->len = len;
+        memcpy(a->data, data, len);
+
+        return a;
+}
+
+void byte_array_free(struct byte_array *a)
+{
+        free(a);
+}
+
 struct addrinfo *do_getaddrinfo(const char *host, const char *port, int flags,
                                 const struct options *opts,
                                 struct callbacks *cb)

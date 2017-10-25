@@ -18,7 +18,6 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -37,31 +36,6 @@ enum run_mode { CLIENT, SERVER };
 static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
-
-struct byte_array {
-        uint8_t *data;
-        size_t len;
-};
-
-static struct byte_array *byte_array_new(const uint8_t *data, size_t len)
-{
-        struct byte_array *a;
-
-        assert(data);
-
-        a = calloc(1, sizeof(*a) + len + 1);
-        assert(a);
-        a->data = (void *) (a + 1);
-        a->len = len;
-        memcpy(a->data, data, len);
-
-        return a;
-}
-
-static void byte_array_free(struct byte_array *a)
-{
-        free(a);
-}
 
 static enum script_hook_error errno_lua(int err)
 {
