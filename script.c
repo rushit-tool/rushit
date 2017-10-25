@@ -141,10 +141,7 @@ static struct script_engine *get_context(lua_State *L)
         return se;
 }
 
-struct l_upvalue {
-        struct l_upvalue *next;
-
-        int index;
+struct l_object {
         int type;
         union {
                 bool boolean;
@@ -154,7 +151,34 @@ struct l_upvalue {
         };
 };
 
-static struct l_upvalue *l_upvalue_new(int index, int type)
+struct l_upvalue {
+        struct l_upvalue *next;
+        int index;
+        struct l_object value;
+};
+
+static void l_object_free_data(struct l_object *o)
+{
+        if (!o)
+                return;
+
+        switch (o->type) {
+        case LUA_TBOOLEAN:
+        case LUA_TNUMBER:
+                /* nothing to do */
+                break;
+        case LUA_TSTRING:
+                free(o->string);
+                break;
+        case LUA_TFUNCTION:
+                byte_array_free(o->function);
+                break;
+        default:
+                assert(false);
+        }
+}
+
+static struct l_upvalue *l_upvalue_new(int index)
 {
         struct l_upvalue *v;
 
@@ -162,7 +186,6 @@ static struct l_upvalue *l_upvalue_new(int index, int type)
         assert(v);
 
         v->index = index;
-        v->type = type;
 
         return v;
 }
@@ -172,50 +195,33 @@ static void l_upvalue_free(struct l_upvalue *v)
         if (!v)
                 return;
 
-        switch (v->type) {
-        case LUA_TBOOLEAN:
-        case LUA_TNUMBER:
-                /* nothing to do */
-                break;
-        case LUA_TSTRING:
-                free(v->string);
-                break;
-        case LUA_TFUNCTION:
-                byte_array_free(v->function);
-                break;
-        default:
-                assert(false);
-        }
+        l_object_free_data(&v->value);
         free(v);
 }
 
-static struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                           int index)
+static void serialize_object(struct callbacks *cb, lua_State *L, int index,
+                             struct l_object *object)
 {
-        struct l_upvalue *v;
-        int type;
+        object->type = lua_type(L, index);
 
-        type = lua_type(L, -1);
-        v = l_upvalue_new(index, type);
-
-        switch (type) {
+        switch (object->type) {
         case LUA_TNIL:
                 assert(false);
                 break;
         case LUA_TNUMBER:
-                v->number = lua_tonumber(L, -1);
+                object->number = lua_tonumber(L, index);
                 break;
         case LUA_TBOOLEAN:
-                v->boolean = lua_toboolean(L, -1);
+                object->boolean = lua_toboolean(L, index);
                 break;
         case LUA_TSTRING:
-                v->string = strdup(lua_tostring(L, -1));
+                object->string = strdup(lua_tostring(L, index));
                 break;
         case LUA_TTABLE:
                 assert(false); /* XXX: Not implemented */
                 break;
         case LUA_TFUNCTION:
-                v->function = dump_function_bytecode(cb, L, -1);
+                object->function = dump_function_bytecode(cb, L, index);
                 break;
         case LUA_TUSERDATA:
                 assert(false); /* XXX: Not implemented */
@@ -229,6 +235,15 @@ static struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
         default:
                 assert(false);
         }
+}
+
+static struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
+                                           int index)
+{
+        struct l_upvalue *v;
+
+        v = l_upvalue_new(index);
+        serialize_object(cb, L, -1, &v->value);
 
         return v;
 }
@@ -654,29 +669,34 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         return  0;
 }
 
-static void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                         struct l_upvalue *upvalue)
+static void push_object(struct callbacks *cb, lua_State *L,
+                        struct l_object *object)
 {
-        const char *n;
-
-        switch (upvalue->type) {
+        switch (object->type) {
         case LUA_TBOOLEAN:
-                lua_pushboolean(L, upvalue->boolean);
+                lua_pushboolean(L, object->boolean);
                 break;
         case LUA_TNUMBER:
-                lua_pushnumber(L, upvalue->number);
+                lua_pushnumber(L, object->number);
                 break;
         case LUA_TSTRING:
-                lua_pushstring(L, upvalue->string);
+                lua_pushstring(L, object->string);
                 break;
         case LUA_TFUNCTION:
-                load_function_bytecode(cb, L, upvalue->function, NULL);
+                load_function_bytecode(cb, L, object->function, NULL);
                 break;
         default:
                 assert(false);
                 break;
         }
+}
 
+static void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+                         struct l_upvalue *upvalue)
+{
+        const char *n;
+
+        push_object(cb, L, &upvalue->value);
         n = lua_setupvalue(L, func_index, upvalue->index);
         assert(n);
 }
