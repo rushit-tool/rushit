@@ -37,11 +37,6 @@ static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
 
-static void assert_lua_stack_is_empty(lua_State *L)
-{
-        assert(lua_gettop(L) == 0);
-}
-
 struct l_string {
         char *data;
         size_t len;
@@ -711,26 +706,56 @@ static void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
         assert(n);
 }
 
+/* Load a serialized hook function. Return a key to it in the registry. */
+static int load_hook(struct callbacks *cb, lua_State *L,
+                     const struct script_hook *hook, void **key)
+{
+        struct l_upvalue *v;
+        int err, hook_idx;
+        void *k;
+
+        if (!hook->bytecode)
+                return -EHOOKEMPTY;
+
+        err = load_function_bytecode(cb, L, hook->bytecode, hook->name);
+        if (err)
+                return err;
+        hook_idx = lua_gettop(L);
+
+        for (v = hook->upvalues; v; v = v->next)
+                push_upvalue(cb, L, hook_idx, v);
+
+        /* TODO: Push globals */
+
+        /* Keep a reference to the hook */
+        k = (void *) lua_topointer(L, -1);
+        lua_pushlightuserdata(L, k);
+        lua_insert(L, -2);
+        lua_rawset(L, LUA_REGISTRYINDEX);
+
+        *key = k;
+        return 0;
+}
+
 static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
-        struct l_upvalue *v;
-        int err, hook_idx;
+        lua_State *L;
+        int err;
+
+        assert(ss);
 
         h = script_engine_get_hook(ss->se, hid);
-        if (!h->bytecode)
-                return -EHOOKEMPTY;
+        L = ss->L;
 
-        assert_lua_stack_is_empty(ss->L);
-        hook_idx = 1;
+        if (!ss->hook_key[hid]) {
+                err = load_hook(ss->cb, L, h, &ss->hook_key[hid]);
+                if (err)
+                        return err;
+        }
 
-        err = load_function_bytecode(ss->cb, ss->L, h->bytecode, h->name);
-        if (err)
-                return err;
-
-        for (v = h->upvalues; v; v = v->next)
-                push_upvalue(ss->cb, ss->L, hook_idx, v);
-        /* TODO: Push globals */
+        lua_pushlightuserdata(L, ss->hook_key[hid]);
+        lua_gettable(L, LUA_REGISTRYINDEX);
 
         return 0;
 }

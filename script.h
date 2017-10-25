@@ -73,6 +73,7 @@ struct script_slave {
         struct script_engine *se;
         struct lua_State *L;
         struct callbacks *cb;
+        void *hook_key[SCRIPT_HOOK_MAX];
 };
 
 int script_engine_create(struct script_engine **sep, struct callbacks *cb,
