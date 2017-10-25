@@ -18,6 +18,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -37,29 +38,29 @@ static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
 
-struct l_string {
-        char *data;
+struct byte_array {
+        uint8_t *data;
         size_t len;
 };
 
-static struct l_string *l_string_new(const char *data, size_t len)
+static struct byte_array *byte_array_new(const uint8_t *data, size_t len)
 {
-        struct l_string *s;
+        struct byte_array *a;
 
         assert(data);
 
-        s = calloc(1, sizeof(*s) + len + 1);
-        assert(s);
-        s->data = (void *) (s + 1);
-        s->len = len;
-        memcpy(s->data, data, len);
+        a = calloc(1, sizeof(*a) + len + 1);
+        assert(a);
+        a->data = (void *) (a + 1);
+        a->len = len;
+        memcpy(a->data, data, len);
 
-        return s;
+        return a;
 }
 
-static void l_string_free(struct l_string *s)
+static void byte_array_free(struct byte_array *a)
 {
-        free(s);
+        free(a);
 }
 
 static enum script_hook_error errno_lua(int err)
@@ -94,18 +95,18 @@ static struct script_hook *script_engine_put_hook(struct script_hook *hook)
 }
 DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
 
-static void hook_set_bytecode(struct script_hook *h, struct l_string *bytecode)
+static void hook_set_bytecode(struct script_hook *h, struct byte_array *bytecode)
 {
         assert(h);
 
-        l_string_free(h->bytecode);
+        byte_array_free(h->bytecode);
         h->bytecode = bytecode;
 }
 
-static struct l_string *dump_function_bytecode(struct callbacks *cb,
+static struct byte_array *dump_function_bytecode(struct callbacks *cb,
                                                lua_State *L)
 {
-        struct l_string *code;
+        struct byte_array *code;
         const char *buf;
         size_t len = 0;
         luaL_Buffer B;
@@ -120,19 +121,19 @@ static struct l_string *dump_function_bytecode(struct callbacks *cb,
         if (!buf || !len)
                 LOG_FATAL(cb, "lua_dump returned an empty buffer");
 
-        code = l_string_new(buf, len);
+        code = byte_array_new((uint8_t *) buf, len);
         lua_pop(L, 1);
 
         return code;
 }
 
 static int load_function_bytecode(struct callbacks *cb, lua_State *L,
-                                  const struct l_string *bytecode,
+                                  const struct byte_array *bytecode,
                                   const char *name)
 {
         int err;
 
-        err = luaL_loadbuffer(L, bytecode->data, bytecode->len, name);
+        err = luaL_loadbuffer(L, (char *) bytecode->data, bytecode->len, name);
         if (err) {
                 LOG_FATAL(cb, "%s: luaL_loadbuffer: %s",
                           name, lua_tostring(L, -1));
@@ -145,7 +146,7 @@ static int load_function_bytecode(struct callbacks *cb, lua_State *L,
 static int store_hook_bytecode(struct callbacks *cb, lua_State *L,
                                struct script_hook *hook)
 {
-        struct l_string *code;
+        struct byte_array *code;
 
         code = dump_function_bytecode(cb, L);
         hook_set_bytecode(hook, code);
@@ -175,7 +176,7 @@ struct l_upvalue {
                 bool boolean;
                 lua_Number number;
                 char *string;
-                struct l_string *function;
+                struct byte_array *function;
         };
 };
 
@@ -206,7 +207,7 @@ static void l_upvalue_free(struct l_upvalue *v)
                 free(v->string);
                 break;
         case LUA_TFUNCTION:
-                l_string_free(v->function);
+                byte_array_free(v->function);
                 break;
         default:
                 assert(false);
@@ -503,7 +504,7 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         se->L = NULL;
 
         for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++) {
-                l_string_free(h->bytecode);
+                byte_array_free(h->bytecode);
                 hook_unset_upvalues(h);
         }
 
