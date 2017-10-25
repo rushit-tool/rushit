@@ -78,7 +78,7 @@ static void hook_set_bytecode(struct script_hook *h, struct byte_array *bytecode
 }
 
 static struct byte_array *dump_function_bytecode(struct callbacks *cb,
-                                               lua_State *L)
+                                                 lua_State *L, int index)
 {
         struct byte_array *code;
         const char *buf;
@@ -91,7 +91,7 @@ static struct byte_array *dump_function_bytecode(struct callbacks *cb,
         if (err)
                 LOG_FATAL(cb, "lua_dump: %s", lua_tostring(L, -1));
         luaL_pushresult(&B);
-        buf = lua_tolstring(L, -1, &len);
+        buf = lua_tolstring(L, index, &len);
         if (!buf || !len)
                 LOG_FATAL(cb, "lua_dump returned an empty buffer");
 
@@ -122,7 +122,7 @@ static int store_hook_bytecode(struct callbacks *cb, lua_State *L,
 {
         struct byte_array *code;
 
-        code = dump_function_bytecode(cb, L);
+        code = dump_function_bytecode(cb, L, -1);
         hook_set_bytecode(hook, code);
 
         return 0;
@@ -215,7 +215,7 @@ static struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                 assert(false); /* XXX: Not implemented */
                 break;
         case LUA_TFUNCTION:
-                v->function = dump_function_bytecode(cb, L);
+                v->function = dump_function_bytecode(cb, L, -1);
                 break;
         case LUA_TUSERDATA:
                 assert(false); /* XXX: Not implemented */
