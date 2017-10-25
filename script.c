@@ -148,6 +148,7 @@ struct l_object {
                 lua_Number number;
                 char *string;
                 struct byte_array *function;
+                struct l_table_entry *table;
         };
 };
 
@@ -156,6 +157,29 @@ struct l_upvalue {
         int index;
         struct l_object value;
 };
+
+struct l_table_entry {
+        struct l_table_entry *next;
+        struct l_object key;
+        struct l_object value;
+};
+
+static void l_object_free_data(struct l_object *o);
+
+static void table_free(struct l_table_entry *table)
+{
+        struct l_table_entry *next;
+
+        while (table) {
+                next = table->next;
+
+                l_object_free_data(&table->key);
+                l_object_free_data(&table->value);
+                free(table);
+
+                table = next;
+        }
+}
 
 static void l_object_free_data(struct l_object *o)
 {
@@ -172,6 +196,9 @@ static void l_object_free_data(struct l_object *o)
                 break;
         case LUA_TFUNCTION:
                 byte_array_free(o->function);
+                break;
+        case LUA_TTABLE:
+                table_free(o->table);
                 break;
         default:
                 assert(false);
@@ -200,6 +227,32 @@ static void l_upvalue_free(struct l_upvalue *v)
 }
 
 static void serialize_object(struct callbacks *cb, lua_State *L, int index,
+                             struct l_object *object);
+
+static struct l_table_entry *dump_table_entries(struct callbacks *cb,
+                                                lua_State *L, int index)
+{
+        struct l_table_entry *head = NULL;
+        int tbl_idx;
+
+        tbl_idx = lua_gettop(L);
+        lua_pushnil(L);
+        while (lua_next(L, tbl_idx)) {
+                struct l_table_entry *e = calloc(1, sizeof(*e));
+                if (!e)
+                        LOG_FATAL(cb, "calloc failed");
+                e->next = head;
+                head = e;
+
+                serialize_object(cb, L, -2, &e->key);
+                serialize_object(cb, L, -1, &e->value);
+                lua_pop(L, 1);
+        }
+
+        return head;
+}
+
+static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                              struct l_object *object)
 {
         object->type = lua_type(L, index);
@@ -218,7 +271,7 @@ static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                 object->string = strdup(lua_tostring(L, index));
                 break;
         case LUA_TTABLE:
-                assert(false); /* XXX: Not implemented */
+                object->table = dump_table_entries(cb, L, index);
                 break;
         case LUA_TFUNCTION:
                 object->function = dump_function_bytecode(cb, L, index);
@@ -670,6 +723,22 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
 }
 
 static void push_object(struct callbacks *cb, lua_State *L,
+                        struct l_object *object);
+
+static void push_table(struct callbacks *cb, lua_State *L,
+                       struct l_table_entry *table)
+{
+        struct l_table_entry *e;
+
+        lua_newtable(L);
+        for (e = table; e; e = e->next) {
+                push_object(cb, L, &e->key);
+                push_object(cb, L, &e->value);
+                lua_rawset(L, -3);
+        }
+}
+
+static void push_object(struct callbacks *cb, lua_State *L,
                         struct l_object *object)
 {
         switch (object->type) {
@@ -684,6 +753,9 @@ static void push_object(struct callbacks *cb, lua_State *L,
                 break;
         case LUA_TFUNCTION:
                 load_function_bytecode(cb, L, object->function, NULL);
+                break;
+        case LUA_TTABLE:
+                push_table(cb, L, object->table);
                 break;
         default:
                 assert(false);

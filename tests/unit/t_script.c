@@ -482,6 +482,30 @@ static void t_run_hook_with_function_upvalue(void **state)
         assert_return_code(r, -r);
 }
 
+static void t_run_hook_with_table_of_primitive_values_upvalue(void **state)
+{
+        const char *script =
+                "local t = { 's', 42, false };"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_not_nil(t)
+                "    " lua_assert_equal(t[1], 's')
+                "    " lua_assert_equal(t[2], 42)
+                "    " lua_assert_false(t[3])
+                "    return 0;"
+                "  end"
+                ")";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
 static void t_upvalues_dont_get_reset(void **state)
 {
         const char *script =
@@ -532,6 +556,7 @@ int main(void)
                 client_slave_unit_test(t_run_hook_with_one_primitive_upvalue),
                 client_slave_unit_test(t_run_hook_with_multiple_upvalues),
                 client_slave_unit_test(t_run_hook_with_function_upvalue),
+                client_slave_unit_test(t_run_hook_with_table_of_primitive_values_upvalue),
                 client_slave_unit_test(t_upvalues_dont_get_reset),
         };
 
