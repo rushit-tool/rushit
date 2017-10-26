@@ -76,7 +76,7 @@ static int store_hook_bytecode(struct callbacks *cb, lua_State *L,
 {
         struct byte_array *code;
 
-        code = dump_function_bytecode(cb, L, -1);
+        code = dump_function_bytecode(cb, L);
         hook_set_bytecode(hook, code);
 
         return 0;

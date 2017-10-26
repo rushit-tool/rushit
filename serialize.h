@@ -54,12 +54,18 @@ struct l_upvalue {
 };
 
 
-struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L,
-                                          int index);
+/**
+ * Serializes the Lua function at the top of the stack. Just the function code
+ * without its upvalues.
+ */
+struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L);
 
+/**
+ * Deserializes the function and leaves it on top the stack. Function upvalues
+ * have to be set separately.
+ */
 int load_function_bytecode(struct callbacks *cb, lua_State *L,
-                           const struct byte_array *bytecode,
-                           const char *name);
+                           const struct byte_array *bytecode, const char *name);
 
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                                     int index);

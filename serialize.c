@@ -100,8 +100,7 @@ static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
         return 0;
 }
 
-struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L,
-                                          int index)
+struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L)
 {
         struct byte_array *code;
         const char *buf;
@@ -114,7 +113,7 @@ struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L,
         if (err)
                 LOG_FATAL(cb, "lua_dump: %s", lua_tostring(L, -1));
         luaL_pushresult(&B);
-        buf = lua_tolstring(L, index, &len);
+        buf = lua_tolstring(L, -1, &len);
         if (!buf || !len)
                 LOG_FATAL(cb, "lua_dump returned an empty buffer");
 
@@ -185,7 +184,8 @@ static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                 object->table = dump_table_entries(cb, L, index);
                 break;
         case LUA_TFUNCTION:
-                object->function = dump_function_bytecode(cb, L, index);
+                assert(index == -1); /* Not supported */
+                object->function = dump_function_bytecode(cb, L);
                 break;
         case LUA_TUSERDATA:
                 assert(false); /* XXX: Not implemented */
