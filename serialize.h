@@ -21,4 +21,46 @@
 #ifndef NEPER_SERIALIZE_H
 #define NEPER_SERIALIZE_H
 
+#include <stdbool.h>
+
+#include "lua.h"
+#include "lauxlib.h"
+#include "lualib.h"
+
+
+struct callbacks;
+
+struct l_object {
+        int type;
+        union {
+                bool boolean;
+                lua_Number number;
+                char *string;
+                struct byte_array *function;
+                struct l_table_entry *table;
+        };
+};
+
+struct l_table_entry {
+        struct l_table_entry *next;
+        struct l_object key;
+        struct l_object value;
+};
+
+struct l_upvalue {
+        struct l_upvalue *next;
+        int index;
+        struct l_object value;
+};
+
+
+struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L,
+                                          int index);
+
+struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
+                                    int index);
+
+void l_upvalue_free(struct l_upvalue *v);
+
+
 #endif
