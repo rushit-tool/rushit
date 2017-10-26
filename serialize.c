@@ -23,11 +23,14 @@
 #include "common.h"
 #include "lib.h"
 #include "logging.h"
+#include "script.h"
 
 
 static void l_object_free_data(struct l_object *o);
 static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                              struct l_object *object);
+static void push_object(struct callbacks *cb, lua_State *L,
+                        struct l_object *object);
 
 
 static void table_free(struct l_table_entry *table)
@@ -121,6 +124,22 @@ struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L,
         return code;
 }
 
+int load_function_bytecode(struct callbacks *cb, lua_State *L,
+                           const struct byte_array *bytecode,
+                           const char *name)
+{
+        int err;
+
+        err = luaL_loadbuffer(L, (char *) bytecode->data, bytecode->len, name);
+        if (err) {
+                LOG_FATAL(cb, "%s: luaL_loadbuffer: %s",
+                          name, lua_tostring(L, -1));
+                return -errno_lua(err);
+        }
+
+        return 0;
+}
+
 static struct l_table_entry *dump_table_entries(struct callbacks *cb,
                                                 lua_State *L, int index)
 {
@@ -191,4 +210,52 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
         serialize_object(cb, L, -1, &v->value);
 
         return v;
+}
+
+static void push_table(struct callbacks *cb, lua_State *L,
+                       struct l_table_entry *table)
+{
+        struct l_table_entry *e;
+
+        lua_newtable(L);
+        for (e = table; e; e = e->next) {
+                push_object(cb, L, &e->key);
+                push_object(cb, L, &e->value);
+                lua_rawset(L, -3);
+        }
+}
+
+static void push_object(struct callbacks *cb, lua_State *L,
+                        struct l_object *object)
+{
+        switch (object->type) {
+        case LUA_TBOOLEAN:
+                lua_pushboolean(L, object->boolean);
+                break;
+        case LUA_TNUMBER:
+                lua_pushnumber(L, object->number);
+                break;
+        case LUA_TSTRING:
+                lua_pushstring(L, object->string);
+                break;
+        case LUA_TFUNCTION:
+                load_function_bytecode(cb, L, object->function, NULL);
+                break;
+        case LUA_TTABLE:
+                push_table(cb, L, object->table);
+                break;
+        default:
+                assert(false);
+                break;
+        }
+}
+
+void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+                  struct l_upvalue *upvalue)
+{
+        const char *n;
+
+        push_object(cb, L, &upvalue->value);
+        n = lua_setupvalue(L, func_index, upvalue->index);
+        assert(n);
 }

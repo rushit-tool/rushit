@@ -38,7 +38,7 @@ static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
 
-static enum script_hook_error errno_lua(int err)
+enum script_hook_error errno_lua(int err)
 {
         assert(err == LUA_ERRRUN || err == LUA_ERRSYNTAX ||
                err == LUA_ERRMEM || err == LUA_ERRERR);
@@ -69,22 +69,6 @@ static void hook_set_bytecode(struct script_hook *h, struct byte_array *bytecode
 
         byte_array_free(h->bytecode);
         h->bytecode = bytecode;
-}
-
-static int load_function_bytecode(struct callbacks *cb, lua_State *L,
-                                  const struct byte_array *bytecode,
-                                  const char *name)
-{
-        int err;
-
-        err = luaL_loadbuffer(L, (char *) bytecode->data, bytecode->len, name);
-        if (err) {
-                LOG_FATAL(cb, "%s: luaL_loadbuffer: %s",
-                          name, lua_tostring(L, -1));
-                return -errno_lua(err);
-        }
-
-        return 0;
 }
 
 static int store_hook_bytecode(struct callbacks *cb, lua_State *L,
@@ -530,57 +514,6 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         /* Remove ffi module */
         lua_remove(L, -2);
         return  0;
-}
-
-static void push_object(struct callbacks *cb, lua_State *L,
-                        struct l_object *object);
-
-static void push_table(struct callbacks *cb, lua_State *L,
-                       struct l_table_entry *table)
-{
-        struct l_table_entry *e;
-
-        lua_newtable(L);
-        for (e = table; e; e = e->next) {
-                push_object(cb, L, &e->key);
-                push_object(cb, L, &e->value);
-                lua_rawset(L, -3);
-        }
-}
-
-static void push_object(struct callbacks *cb, lua_State *L,
-                        struct l_object *object)
-{
-        switch (object->type) {
-        case LUA_TBOOLEAN:
-                lua_pushboolean(L, object->boolean);
-                break;
-        case LUA_TNUMBER:
-                lua_pushnumber(L, object->number);
-                break;
-        case LUA_TSTRING:
-                lua_pushstring(L, object->string);
-                break;
-        case LUA_TFUNCTION:
-                load_function_bytecode(cb, L, object->function, NULL);
-                break;
-        case LUA_TTABLE:
-                push_table(cb, L, object->table);
-                break;
-        default:
-                assert(false);
-                break;
-        }
-}
-
-static void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                         struct l_upvalue *upvalue)
-{
-        const char *n;
-
-        push_object(cb, L, &upvalue->value);
-        n = lua_setupvalue(L, func_index, upvalue->index);
-        assert(n);
 }
 
 /* Load a serialized hook function. Return a key to it in the registry. */

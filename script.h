@@ -116,6 +116,7 @@ ssize_t script_slave_recvmsg_hook(struct script_slave *ss, int sockfd,
 ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
                                   struct msghdr *msg, int flags);
 
+enum script_hook_error errno_lua(int err);
 const char *script_strerror(int errnum);
 
 #endif

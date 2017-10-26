@@ -57,10 +57,17 @@ struct l_upvalue {
 struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L,
                                           int index);
 
+int load_function_bytecode(struct callbacks *cb, lua_State *L,
+                           const struct byte_array *bytecode,
+                           const char *name);
+
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                                     int index);
 
 void l_upvalue_free(struct l_upvalue *v);
+
+void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+                  struct l_upvalue *upvalue);
 
 
 #endif
