@@ -202,11 +202,11 @@ static void serialize_object(struct callbacks *cb, lua_State *L, int index,
 }
 
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                    int index)
+                                    int number)
 {
         struct l_upvalue *v;
 
-        v = l_upvalue_new(index);
+        v = l_upvalue_new(number);
         serialize_object(cb, L, -1, &v->value);
 
         return v;

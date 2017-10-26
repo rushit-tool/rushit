@@ -67,11 +67,22 @@ struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L);
 int load_function_bytecode(struct callbacks *cb, lua_State *L,
                            const struct byte_array *bytecode, const char *name);
 
+/**
+ * Serializes an upvalue. Expects the upvalue to be at the top of the stack.
+ * Takes the upvalue's number for use during deserialization at a later time.
+ */
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                    int index);
+                                    int number);
 
+/**
+ * Frees the memory allocated for a serialized upvalue.
+ */
 void l_upvalue_free(struct l_upvalue *v);
 
+/**
+ * Deserializes and sets an upvalue of a function. Expected the function to be
+ * at func_index on the stack.
+ */
 void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
                   struct l_upvalue *upvalue);
 
