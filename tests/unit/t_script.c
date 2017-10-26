@@ -482,6 +482,56 @@ static void t_run_hook_with_function_upvalue(void **state)
         assert_return_code(r, -r);
 }
 
+static void t_run_hook_with_table_of_primitive_values_upvalue(void **state)
+{
+        const char *script =
+                "local t = { 's', 42, false };"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_not_nil(t)
+                "    " lua_assert_equal(t[1], 's')
+                "    " lua_assert_equal(t[2], 42)
+                "    " lua_assert_false(t[3])
+                "    return 0;"
+                "  end"
+                ")";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_upvalues_dont_get_reset(void **state)
+{
+        const char *script =
+                "local count = 0;"
+                "client_socket("
+                "  function ()"
+                "    count = count + 1;"
+                "    return count;"
+                "  end"
+                ")";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+        assert_int_equal(r, 1);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+        assert_int_equal(r, 2);
+}
+
 #define clinet_engine_unit_test(f) \
         cmocka_unit_test_setup_teardown((f), client_engine_setup, client_engine_teardown)
 #define client_slave_unit_test(f) \
@@ -506,6 +556,8 @@ int main(void)
                 client_slave_unit_test(t_run_hook_with_one_primitive_upvalue),
                 client_slave_unit_test(t_run_hook_with_multiple_upvalues),
                 client_slave_unit_test(t_run_hook_with_function_upvalue),
+                client_slave_unit_test(t_run_hook_with_table_of_primitive_values_upvalue),
+                client_slave_unit_test(t_upvalues_dont_get_reset),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);

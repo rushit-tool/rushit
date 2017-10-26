@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <netdb.h>
 #include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +37,12 @@
 #define UNUSED(x) ((void) (x))
 
 struct script_slave;
+
+struct byte_array {
+        uint8_t *data;
+        size_t len;
+};
+
 
 static inline void free_cleanup(void *p) { free(*(void **) p); }
 #define CLEANUP(f) __attribute__((cleanup(f##_cleanup)))
@@ -75,6 +82,9 @@ static inline int flows_in_thread(int num_flows, int num_threads, int tid)
                                          min_flows_per_thread;
         return flows_in_this_thread;
 }
+
+struct byte_array *byte_array_new(const uint8_t *data, size_t len);
+void byte_array_free(struct byte_array *a);
 
 struct addrinfo *do_getaddrinfo(const char *host, const char *port, int flags,
                                 const struct options *opts,

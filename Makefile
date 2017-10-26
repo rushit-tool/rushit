@@ -64,6 +64,7 @@ base-objs := \
 	sample.o \
 	script.o \
 	script_prelude.o \
+	serialize.o \
 	thread.o \
 	version.o
 

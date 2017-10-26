@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "serialize.h"
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -37,37 +38,7 @@ static void *SCRIPT_ENGINE_KEY = &SCRIPT_ENGINE_KEY;
 
 DEFINE_CLEANUP_FUNC(lua_close, lua_State *);
 
-static void assert_lua_stack_is_empty(lua_State *L)
-{
-        assert(lua_gettop(L) == 0);
-}
-
-struct l_string {
-        char *data;
-        size_t len;
-};
-
-static struct l_string *l_string_new(const char *data, size_t len)
-{
-        struct l_string *s;
-
-        assert(data);
-
-        s = calloc(1, sizeof(*s) + len + 1);
-        assert(s);
-        s->data = (void *) (s + 1);
-        s->len = len;
-        memcpy(s->data, data, len);
-
-        return s;
-}
-
-static void l_string_free(struct l_string *s)
-{
-        free(s);
-}
-
-static enum script_hook_error errno_lua(int err)
+enum script_hook_error errno_lua(int err)
 {
         assert(err == LUA_ERRRUN || err == LUA_ERRSYNTAX ||
                err == LUA_ERRMEM || err == LUA_ERRERR);
@@ -77,13 +48,6 @@ static enum script_hook_error errno_lua(int err)
 /*
  * Lua to C callbacks
  */
-
-static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
-{
-        UNUSED(L);
-        luaL_addlstring(buf, str, len);
-        return 0;
-}
 
 static struct script_hook *script_engine_get_hook(struct script_engine *se,
                                                   enum script_hook_id hid)
@@ -99,58 +63,18 @@ static struct script_hook *script_engine_put_hook(struct script_hook *hook)
 }
 DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
 
-static void hook_set_bytecode(struct script_hook *h, struct l_string *bytecode)
+static void hook_set_bytecode(struct script_hook *h, struct byte_array *bytecode)
 {
         assert(h);
 
-        l_string_free(h->bytecode);
+        byte_array_free(h->bytecode);
         h->bytecode = bytecode;
-}
-
-static struct l_string *dump_function_bytecode(struct callbacks *cb,
-                                               lua_State *L)
-{
-        struct l_string *code;
-        const char *buf;
-        size_t len = 0;
-        luaL_Buffer B;
-        int err;
-
-        luaL_buffinit(L, &B);
-        err = lua_dump(L, string_writer, &B);
-        if (err)
-                LOG_FATAL(cb, "lua_dump: %s", lua_tostring(L, -1));
-        luaL_pushresult(&B);
-        buf = lua_tolstring(L, -1, &len);
-        if (!buf || !len)
-                LOG_FATAL(cb, "lua_dump returned an empty buffer");
-
-        code = l_string_new(buf, len);
-        lua_pop(L, 1);
-
-        return code;
-}
-
-static int load_function_bytecode(struct callbacks *cb, lua_State *L,
-                                  const struct l_string *bytecode,
-                                  const char *name)
-{
-        int err;
-
-        err = luaL_loadbuffer(L, bytecode->data, bytecode->len, name);
-        if (err) {
-                LOG_FATAL(cb, "%s: luaL_loadbuffer: %s",
-                          name, lua_tostring(L, -1));
-                return -errno_lua(err);
-        }
-
-        return 0;
 }
 
 static int store_hook_bytecode(struct callbacks *cb, lua_State *L,
                                struct script_hook *hook)
 {
-        struct l_string *code;
+        struct byte_array *code;
 
         code = dump_function_bytecode(cb, L);
         hook_set_bytecode(hook, code);
@@ -169,98 +93,6 @@ static struct script_engine *get_context(lua_State *L)
         lua_pop(L, 1);
 
         return se;
-}
-
-struct l_upvalue {
-        struct l_upvalue *next;
-
-        int index;
-        int type;
-        union {
-                bool boolean;
-                lua_Number number;
-                char *string;
-                struct l_string *function;
-        };
-};
-
-static struct l_upvalue *l_upvalue_new(int index, int type)
-{
-        struct l_upvalue *v;
-
-        v = calloc(1, sizeof(*v));
-        assert(v);
-
-        v->index = index;
-        v->type = type;
-
-        return v;
-}
-
-static void l_upvalue_free(struct l_upvalue *v)
-{
-        if (!v)
-                return;
-
-        switch (v->type) {
-        case LUA_TBOOLEAN:
-        case LUA_TNUMBER:
-                /* nothing to do */
-                break;
-        case LUA_TSTRING:
-                free(v->string);
-                break;
-        case LUA_TFUNCTION:
-                l_string_free(v->function);
-                break;
-        default:
-                assert(false);
-        }
-        free(v);
-}
-
-static struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                           int index)
-{
-        struct l_upvalue *v;
-        int type;
-
-        type = lua_type(L, -1);
-        v = l_upvalue_new(index, type);
-
-        switch (type) {
-        case LUA_TNIL:
-                assert(false);
-                break;
-        case LUA_TNUMBER:
-                v->number = lua_tonumber(L, -1);
-                break;
-        case LUA_TBOOLEAN:
-                v->boolean = lua_toboolean(L, -1);
-                break;
-        case LUA_TSTRING:
-                v->string = strdup(lua_tostring(L, -1));
-                break;
-        case LUA_TTABLE:
-                assert(false); /* XXX: Not implemented */
-                break;
-        case LUA_TFUNCTION:
-                v->function = dump_function_bytecode(cb, L);
-                break;
-        case LUA_TUSERDATA:
-                assert(false); /* XXX: Not implemented */
-                break;
-        case LUA_TTHREAD:
-                assert(false); /* XXX: Not implemented */
-                break;
-        case LUA_TLIGHTUSERDATA:
-                assert(false); /* XXX: Not implemented */
-                break;
-        default:
-                assert(false);
-        }
-
-        return v;
 }
 
 static void hook_set_upvalue(struct script_hook *hook,
@@ -508,7 +340,7 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         se->L = NULL;
 
         for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++) {
-                l_string_free(h->bytecode);
+                byte_array_free(h->bytecode);
                 hook_unset_upvalues(h);
         }
 
@@ -684,53 +516,56 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         return  0;
 }
 
-static void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                         struct l_upvalue *upvalue)
+/* Load a serialized hook function. Return a key to it in the registry. */
+static int load_hook(struct callbacks *cb, lua_State *L,
+                     const struct script_hook *hook, void **key)
 {
-        const char *n;
+        struct l_upvalue *v;
+        int err, hook_idx;
+        void *k;
 
-        switch (upvalue->type) {
-        case LUA_TBOOLEAN:
-                lua_pushboolean(L, upvalue->boolean);
-                break;
-        case LUA_TNUMBER:
-                lua_pushnumber(L, upvalue->number);
-                break;
-        case LUA_TSTRING:
-                lua_pushstring(L, upvalue->string);
-                break;
-        case LUA_TFUNCTION:
-                load_function_bytecode(cb, L, upvalue->function, NULL);
-                break;
-        default:
-                assert(false);
-                break;
-        }
+        if (!hook->bytecode)
+                return -EHOOKEMPTY;
 
-        n = lua_setupvalue(L, func_index, upvalue->index);
-        assert(n);
+        err = load_function_bytecode(cb, L, hook->bytecode, hook->name);
+        if (err)
+                return err;
+        hook_idx = lua_gettop(L);
+
+        for (v = hook->upvalues; v; v = v->next)
+                push_upvalue(cb, L, hook_idx, v);
+
+        /* TODO: Push globals */
+
+        /* Keep a reference to the hook */
+        k = (void *) lua_topointer(L, -1);
+        lua_pushlightuserdata(L, k);
+        lua_insert(L, -2);
+        lua_rawset(L, LUA_REGISTRYINDEX);
+
+        *key = k;
+        return 0;
 }
 
 static int push_hook(struct script_slave *ss, enum script_hook_id hid)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
-        struct l_upvalue *v;
-        int err, hook_idx;
+        lua_State *L;
+        int err;
+
+        assert(ss);
 
         h = script_engine_get_hook(ss->se, hid);
-        if (!h->bytecode)
-                return -EHOOKEMPTY;
+        L = ss->L;
 
-        assert_lua_stack_is_empty(ss->L);
-        hook_idx = 1;
+        if (!ss->hook_key[hid]) {
+                err = load_hook(ss->cb, L, h, &ss->hook_key[hid]);
+                if (err)
+                        return err;
+        }
 
-        err = load_function_bytecode(ss->cb, ss->L, h->bytecode, h->name);
-        if (err)
-                return err;
-
-        for (v = h->upvalues; v; v = v->next)
-                push_upvalue(ss->cb, ss->L, hook_idx, v);
-        /* TODO: Push globals */
+        lua_pushlightuserdata(L, ss->hook_key[hid]);
+        lua_gettable(L, LUA_REGISTRYINDEX);
 
         return 0;
 }

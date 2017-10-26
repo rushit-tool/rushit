@@ -24,7 +24,7 @@ struct addrinfo;
 struct msghdr;
 
 struct lua_State;
-struct l_string;
+struct byte_array;
 struct l_upvalue;
 
 /* Stay out of errno range */
@@ -56,7 +56,7 @@ enum script_hook_id {
 
 struct script_hook {
         const char *name;
-        struct l_string *bytecode;
+        struct byte_array *bytecode;
         struct l_upvalue *upvalues;
 };
 
@@ -73,6 +73,7 @@ struct script_slave {
         struct script_engine *se;
         struct lua_State *L;
         struct callbacks *cb;
+        void *hook_key[SCRIPT_HOOK_MAX];
 };
 
 int script_engine_create(struct script_engine **sep, struct callbacks *cb,
@@ -115,6 +116,7 @@ ssize_t script_slave_recvmsg_hook(struct script_slave *ss, int sockfd,
 ssize_t script_slave_recverr_hook(struct script_slave *ss, int sockfd,
                                   struct msghdr *msg, int flags);
 
+enum script_hook_error errno_lua(int err);
 const char *script_strerror(int errnum);
 
 #endif
