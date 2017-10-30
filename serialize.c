@@ -250,8 +250,8 @@ static void push_object(struct callbacks *cb, lua_State *L,
         }
 }
 
-void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                  struct l_upvalue *upvalue)
+void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+                 struct l_upvalue *upvalue)
 {
         const char *n;
 

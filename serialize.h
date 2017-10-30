@@ -83,8 +83,8 @@ void l_upvalue_free(struct l_upvalue *v);
  * Deserializes and sets an upvalue of a function. Expected the function to be
  * at func_index on the stack.
  */
-void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                  struct l_upvalue *upvalue);
+void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+                 struct l_upvalue *upvalue);
 
 
 #endif

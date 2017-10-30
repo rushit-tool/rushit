@@ -533,7 +533,7 @@ static int load_hook(struct callbacks *cb, lua_State *L,
         hook_idx = lua_gettop(L);
 
         for (v = hook->upvalues; v; v = v->next)
-                push_upvalue(cb, L, hook_idx, v);
+                set_upvalue(cb, L, hook_idx, v);
 
         /* TODO: Push globals */
 
