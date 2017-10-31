@@ -95,16 +95,6 @@ static struct script_engine *get_context(lua_State *L)
         return se;
 }
 
-static void hook_set_upvalue(struct script_hook *hook,
-                             struct l_upvalue *upvalue)
-{
-        assert(hook);
-        assert(upvalue);
-
-        upvalue->next = hook->upvalues;
-        hook->upvalues = upvalue;
-}
-
 static void store_hook_upvalues(struct callbacks *cb, struct lua_State *L,
                                 struct script_hook *hook)
 {
@@ -119,7 +109,7 @@ static void store_hook_upvalues(struct callbacks *cb, struct lua_State *L,
         top = lua_gettop(L);
         for (i = 1; (name = lua_getupvalue(L, top, i)); i++) {
                 upval = serialize_upvalue(cb, L, i);
-                hook_set_upvalue(hook, upval);
+                prepend_upvalue(&hook->upvalues, upval);
                 lua_pop(L, 1);
         }
 }

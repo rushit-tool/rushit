@@ -275,3 +275,12 @@ void destroy_upvalues(struct l_upvalue **head)
                 v = v_next;
         }
 }
+
+void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
+{
+        assert(head);
+        assert(upvalue);
+
+        upvalue->next = *head;
+        *head = upvalue;
+}

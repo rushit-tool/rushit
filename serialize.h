@@ -91,5 +91,10 @@ void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
  */
 void destroy_upvalues(struct l_upvalue **head);
 
+/**
+ * Prepend a new upvalue to a list
+ */
+void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue);
+
 
 #endif
