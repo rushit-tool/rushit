@@ -49,6 +49,7 @@ struct l_table_entry {
 
 struct l_upvalue {
         struct l_upvalue *next;
+        void *id;
         int number;
         struct l_object value;
 };
@@ -72,7 +73,7 @@ int load_function_bytecode(struct callbacks *cb, lua_State *L,
  * Takes the upvalue's number for use during deserialization at a later time.
  */
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                    int number);
+                                    void *id, int number);
 
 /**
  * Frees the memory allocated for a serialized upvalue.

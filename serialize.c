@@ -72,13 +72,14 @@ static void l_object_free_data(struct l_object *o)
         }
 }
 
-static struct l_upvalue *l_upvalue_new(int number)
+static struct l_upvalue *l_upvalue_new(void *id, int number)
 {
         struct l_upvalue *v;
 
         v = calloc(1, sizeof(*v));
         assert(v);
 
+        v->id = id;
         v->number = number;
 
         return v;
@@ -202,11 +203,11 @@ static void serialize_object(struct callbacks *cb, lua_State *L, int index,
 }
 
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                    int number)
+                                    void *id, int number)
 {
         struct l_upvalue *v;
 
-        v = l_upvalue_new(number);
+        v = l_upvalue_new(id, number);
         serialize_object(cb, L, -1, &v->value);
 
         return v;
