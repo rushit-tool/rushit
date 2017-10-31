@@ -26,6 +26,11 @@
 #include "script.h"
 
 
+enum {
+        XLUA_TUPVALUEREF = -1,
+};
+
+
 static void l_object_free_data(struct l_object *o);
 static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                              struct l_object *object);
@@ -56,6 +61,7 @@ static void l_object_free_data(struct l_object *o)
         switch (o->type) {
         case LUA_TBOOLEAN:
         case LUA_TNUMBER:
+        case XLUA_TUPVALUEREF:
                 /* nothing to do */
                 break;
         case LUA_TSTRING:
@@ -284,4 +290,47 @@ void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
 
         upvalue->next = *head;
         *head = upvalue;
+}
+
+struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id)
+{
+        struct l_upvalue *v;
+
+        assert(head);
+
+        for (v = *head; v; v = v->next) {
+                if (v->id == id)
+                        return v;
+        }
+
+        return NULL;
+}
+
+static void init_upvalueref(struct l_object *obj, void *func_id)
+{
+        obj->type = XLUA_TUPVALUEREF;
+        obj->func_id = func_id;
+}
+
+static struct l_upvalue *create_upvalueref(const struct l_upvalue *upvalue,
+                                           void *func_id)
+{
+        struct l_upvalue *v;
+
+        v = l_upvalue_new(upvalue->id, upvalue->number);
+        init_upvalueref(&v->value, func_id);
+
+        return v;
+
+}
+
+void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
+                       void *func_id)
+{
+        struct l_upvalue *v;
+
+        assert(head);
+
+        v = create_upvalueref(upvalue, func_id);
+        prepend_upvalue(head, v);
 }

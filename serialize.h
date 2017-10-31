@@ -38,6 +38,7 @@ struct l_object {
                 char *string;
                 struct byte_array *function;
                 struct l_table_entry *table;
+                void *func_id;
         };
 };
 
@@ -97,5 +98,17 @@ void destroy_upvalues(struct l_upvalue **head);
  */
 void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue);
 
+/**
+ * Find the upvalue with the give id
+ */
+struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id);
+
+/**
+ * Record where an upvalue was set, i.e. in what function, by adding an upvalue
+ * reference (a special upvalue that stores function id) to the list of
+ * references.
+ */
+void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
+                       void *func_id);
 
 #endif
