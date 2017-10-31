@@ -253,9 +253,9 @@ static void push_object(struct callbacks *cb, lua_State *L,
 void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
                  struct l_upvalue *upvalue)
 {
-        const char *n;
+        const char *name;
 
         push_object(cb, L, &upvalue->value);
-        n = lua_setupvalue(L, func_index, upvalue->index);
-        assert(n);
+        name = lua_setupvalue(L, func_index, upvalue->index);
+        assert(name);
 }
