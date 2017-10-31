@@ -498,8 +498,9 @@ static int load_hook(struct callbacks *cb, lua_State *L,
                      const struct script_hook *hook, void **key)
 {
         struct l_upvalue *v;
-        int err, hook_idx;
-        void *k;
+        void *hook_key;
+        int hook_idx;
+        int err;
 
         if (!hook->bytecode)
                 return -EHOOKEMPTY;
@@ -508,6 +509,7 @@ static int load_hook(struct callbacks *cb, lua_State *L,
         if (err)
                 return err;
         hook_idx = lua_gettop(L);
+        hook_key = (void *) lua_topointer(L, -1);
 
         for (v = hook->upvalues; v; v = v->next)
                 set_upvalue(cb, L, hook_idx, v);
@@ -515,12 +517,11 @@ static int load_hook(struct callbacks *cb, lua_State *L,
         /* TODO: Push globals */
 
         /* Keep a reference to the hook */
-        k = (void *) lua_topointer(L, -1);
-        lua_pushlightuserdata(L, k);
+        lua_pushlightuserdata(L, hook_key);
         lua_insert(L, -2);
         lua_rawset(L, LUA_REGISTRYINDEX);
 
-        *key = k;
+        *key = hook_key;
         return 0;
 }
 
