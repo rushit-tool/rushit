@@ -49,7 +49,7 @@ struct l_table_entry {
 
 struct l_upvalue {
         struct l_upvalue *next;
-        int index;
+        int number;
         struct l_object value;
 };
 

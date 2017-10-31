@@ -72,14 +72,14 @@ static void l_object_free_data(struct l_object *o)
         }
 }
 
-static struct l_upvalue *l_upvalue_new(int index)
+static struct l_upvalue *l_upvalue_new(int number)
 {
         struct l_upvalue *v;
 
         v = calloc(1, sizeof(*v));
         assert(v);
 
-        v->index = index;
+        v->number = number;
 
         return v;
 }
@@ -256,7 +256,7 @@ void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
         const char *name;
 
         push_object(cb, L, &upvalue->value);
-        name = lua_setupvalue(L, func_index, upvalue->index);
+        name = lua_setupvalue(L, func_index, upvalue->number);
         assert(name);
 }
 
