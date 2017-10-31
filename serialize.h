@@ -77,11 +77,6 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                                     void *id, int number);
 
 /**
- * Frees the memory allocated for a serialized upvalue.
- */
-void l_upvalue_free(struct l_upvalue *v);
-
-/**
  * Deserializes and sets an upvalue of a function. Expected the function to be
  * at func_index on the stack.
  */

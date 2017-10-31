@@ -91,7 +91,7 @@ static struct l_upvalue *l_upvalue_new(void *id, int number)
         return v;
 }
 
-void l_upvalue_free(struct l_upvalue *v)
+static void l_upvalue_free(struct l_upvalue *v)
 {
         if (!v)
                 return;
