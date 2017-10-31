@@ -31,6 +31,12 @@ enum {
 };
 
 
+struct l_table_entry {
+        struct l_table_entry *next;
+        struct l_object key;
+        struct l_object value;
+};
+
 struct upvalue_cache {
         struct l_upvalue *head;
 };

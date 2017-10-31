@@ -42,12 +42,6 @@ struct l_object {
         };
 };
 
-struct l_table_entry {
-        struct l_table_entry *next;
-        struct l_object key;
-        struct l_object value;
-};
-
 struct l_upvalue {
         struct l_upvalue *next;
         void *id;
