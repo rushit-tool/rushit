@@ -55,6 +55,11 @@ struct l_upvalue {
         struct l_object value;
 };
 
+struct upvalue_cache;
+
+
+struct upvalue_cache * upvalue_cache_new(void);
+void upvalue_cache_free(struct upvalue_cache *c);
 
 /**
  * Serializes the Lua function at the top of the stack. Just the function code
@@ -89,7 +94,7 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
  * implemented by the caller.
  */
 void set_shared_upvalue(struct callbacks *cb, lua_State *L,
-                        struct l_upvalue **upvalue_cache,
+                        struct upvalue_cache *upvalue_cache,
                         void (*get_func)(lua_State *L, void *func_id),
                         void *func_id, const struct l_upvalue *upvalue);
 

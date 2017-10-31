@@ -31,6 +31,11 @@ enum {
 };
 
 
+struct upvalue_cache {
+        struct l_upvalue *head;
+};
+
+
 static void l_object_free_data(struct l_object *o);
 static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                              struct l_object *object);
@@ -344,15 +349,29 @@ static void record_upvalueref(struct l_upvalue **head,
         prepend_upvalue(head, v);
 }
 
+struct upvalue_cache *upvalue_cache_new(void)
+{
+        return calloc(1, sizeof(struct upvalue_cache));
+}
+
+void upvalue_cache_free(struct upvalue_cache *c)
+{
+        if (c) {
+                destroy_upvalues(&c->head);
+                free(c);
+        }
+}
+
 void set_shared_upvalue(struct callbacks *cb, lua_State *L,
-                        struct l_upvalue **upvalue_cache,
+                        struct upvalue_cache *upvalue_cache,
                         void (*get_func)(lua_State *L, void *func_id),
                         void *func_id, const struct l_upvalue *upvalue)
 {
+        struct l_upvalue **head = &upvalue_cache->head;
         struct l_upvalue *v;
 
         (*get_func)(L, func_id);
-        v = find_upvalue_by_id(upvalue_cache, upvalue->id);
+        v = find_upvalue_by_id(head, upvalue->id);
         if (v) {
                 /* An already seen upvalue, we're sharing */
                 (*get_func)(L, v->value.func_id);
@@ -361,7 +380,7 @@ void set_shared_upvalue(struct callbacks *cb, lua_State *L,
         } else {
                 /* Upvalue seen for the first time */
                 set_upvalue(cb, L, lua_gettop(L), upvalue);
-                record_upvalueref(upvalue_cache, upvalue, func_id);
+                record_upvalueref(head, upvalue, func_id);
         }
         lua_pop(L, 1);
 }

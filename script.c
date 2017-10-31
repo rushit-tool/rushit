@@ -419,6 +419,10 @@ int script_slave_create(struct script_slave **ssp, struct script_engine *se)
 
         /* TODO: Install hooks */
 
+        ss->hook_upvalues = upvalue_cache_new();
+        if (!ss->hook_upvalues)
+                return -ENOMEM;
+
         ss->se = se;
         ss->cb = se->cb;
         ss->L = L;
@@ -441,7 +445,7 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
         ss->L = NULL;
         ss->se = NULL;
 
-        destroy_upvalues(&ss->hook_upvalues);
+        upvalue_cache_free(ss->hook_upvalues);
 
         free(ss);
         return NULL;
@@ -504,7 +508,7 @@ static void push_function(lua_State *L, void *func_id)
 /* Load a serialized hook function. Return a key to it in the registry. */
 static int load_hook(struct callbacks *cb, lua_State *L,
                      const struct script_hook *hook,
-                     struct l_upvalue **upvalues,
+                     struct upvalue_cache *upvalues,
                      void **key)
 {
         struct l_upvalue *v;
@@ -546,7 +550,7 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
         L = ss->L;
 
         if (!ss->hook_keys[hid]) {
-                err = load_hook(ss->cb, L, h, &ss->hook_upvalues,
+                err = load_hook(ss->cb, L, h, ss->hook_upvalues,
                                 &ss->hook_keys[hid]);
                 if (err)
                         return err;
