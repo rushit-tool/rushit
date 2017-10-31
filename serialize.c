@@ -259,3 +259,19 @@ void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
         name = lua_setupvalue(L, func_index, upvalue->index);
         assert(name);
 }
+
+void destroy_upvalues(struct l_upvalue **head)
+{
+        struct l_upvalue *v, *v_next;
+
+        assert(head);
+
+        v = *head;
+        *head = NULL;
+
+        while (v) {
+                v_next = v->next;
+                l_upvalue_free(v);
+                v = v_next;
+        }
+}

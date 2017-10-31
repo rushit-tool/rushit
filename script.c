@@ -105,20 +105,6 @@ static void hook_set_upvalue(struct script_hook *hook,
         hook->upvalues = upvalue;
 }
 
-static void hook_unset_upvalues(struct script_hook *hook)
-{
-        struct l_upvalue *v, *v_next;
-
-        v = hook->upvalues;
-        while (v) {
-                v_next = v->next;
-                l_upvalue_free(v);
-                v = v_next;
-        }
-
-        hook->upvalues = NULL;
-}
-
 static void store_hook_upvalues(struct callbacks *cb, struct lua_State *L,
                                 struct script_hook *hook)
 {
@@ -128,7 +114,7 @@ static void store_hook_upvalues(struct callbacks *cb, struct lua_State *L,
 
         assert(hook);
 
-        hook_unset_upvalues(hook);
+        destroy_upvalues(&hook->upvalues);
 
         top = lua_gettop(L);
         for (i = 1; (name = lua_getupvalue(L, top, i)); i++) {
@@ -341,7 +327,7 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
 
         for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++) {
                 byte_array_free(h->bytecode);
-                hook_unset_upvalues(h);
+                destroy_upvalues(&h->upvalues);
         }
 
         free(se);

@@ -86,5 +86,10 @@ void l_upvalue_free(struct l_upvalue *v);
 void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
                  struct l_upvalue *upvalue);
 
+/**
+ * Free upvalues on a list. List head pointer gets set to NULL.
+ */
+void destroy_upvalues(struct l_upvalue **head);
+
 
 #endif
