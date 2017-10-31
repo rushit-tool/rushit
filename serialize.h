@@ -77,29 +77,30 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                                     void *id, int number);
 
 /**
- * Deserializes and sets an upvalue of a function. Expected the function to be
- * at func_index on the stack.
+ * Deserializes and sets an upvalue of a function. Expects the function to be at
+ * func_index on the stack.
  */
 void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
                  struct l_upvalue *upvalue);
 
 /**
- * Free upvalues on a list. List head pointer gets set to NULL.
+ * Frees a list of upvalues. List head pointer gets reset to NULL.
  */
 void destroy_upvalues(struct l_upvalue **head);
 
 /**
- * Prepend a new upvalue to a list
+ * Inserts a given upvale at the begining of a list.
  */
 void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue);
 
 /**
- * Find the upvalue with the give id
+ * Looks through the list for an upvalue with the given id. Returns NULL if no
+ * match was found.
  */
 struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id);
 
 /**
- * Record where an upvalue was set, i.e. in what function, by adding an upvalue
+ * Records where an upvalue was set, i.e. in what function, by adding an upvalue
  * reference (a special upvalue that stores function id) to the list of
  * references.
  */
