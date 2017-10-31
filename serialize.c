@@ -26,6 +26,11 @@
 #include "script.h"
 
 
+enum {
+        XLUA_TUPVALUEREF = -1,
+};
+
+
 static void l_object_free_data(struct l_object *o);
 static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                              struct l_object *object);
@@ -56,6 +61,7 @@ static void l_object_free_data(struct l_object *o)
         switch (o->type) {
         case LUA_TBOOLEAN:
         case LUA_TNUMBER:
+        case XLUA_TUPVALUEREF:
                 /* nothing to do */
                 break;
         case LUA_TSTRING:
@@ -72,14 +78,15 @@ static void l_object_free_data(struct l_object *o)
         }
 }
 
-static struct l_upvalue *l_upvalue_new(int index)
+static struct l_upvalue *l_upvalue_new(void *id, int number)
 {
         struct l_upvalue *v;
 
         v = calloc(1, sizeof(*v));
         assert(v);
 
-        v->index = index;
+        v->id = id;
+        v->number = number;
 
         return v;
 }
@@ -202,11 +209,11 @@ static void serialize_object(struct callbacks *cb, lua_State *L, int index,
 }
 
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                    int number)
+                                    void *id, int number)
 {
         struct l_upvalue *v;
 
-        v = l_upvalue_new(number);
+        v = l_upvalue_new(id, number);
         serialize_object(cb, L, -1, &v->value);
 
         return v;
@@ -250,12 +257,80 @@ static void push_object(struct callbacks *cb, lua_State *L,
         }
 }
 
-void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                  struct l_upvalue *upvalue)
+void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+                 struct l_upvalue *upvalue)
 {
-        const char *n;
+        const char *name;
 
         push_object(cb, L, &upvalue->value);
-        n = lua_setupvalue(L, func_index, upvalue->index);
-        assert(n);
+        name = lua_setupvalue(L, func_index, upvalue->number);
+        assert(name);
+}
+
+void destroy_upvalues(struct l_upvalue **head)
+{
+        struct l_upvalue *v, *v_next;
+
+        assert(head);
+
+        v = *head;
+        *head = NULL;
+
+        while (v) {
+                v_next = v->next;
+                l_upvalue_free(v);
+                v = v_next;
+        }
+}
+
+void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
+{
+        assert(head);
+        assert(upvalue);
+
+        upvalue->next = *head;
+        *head = upvalue;
+}
+
+struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id)
+{
+        struct l_upvalue *v;
+
+        assert(head);
+
+        for (v = *head; v; v = v->next) {
+                if (v->id == id)
+                        return v;
+        }
+
+        return NULL;
+}
+
+static void init_upvalueref(struct l_object *obj, void *func_id)
+{
+        obj->type = XLUA_TUPVALUEREF;
+        obj->func_id = func_id;
+}
+
+static struct l_upvalue *create_upvalueref(const struct l_upvalue *upvalue,
+                                           void *func_id)
+{
+        struct l_upvalue *v;
+
+        v = l_upvalue_new(upvalue->id, upvalue->number);
+        init_upvalueref(&v->value, func_id);
+
+        return v;
+
+}
+
+void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
+                       void *func_id)
+{
+        struct l_upvalue *v;
+
+        assert(head);
+
+        v = create_upvalueref(upvalue, func_id);
+        prepend_upvalue(head, v);
 }

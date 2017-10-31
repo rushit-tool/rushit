@@ -38,6 +38,7 @@ struct l_object {
                 char *string;
                 struct byte_array *function;
                 struct l_table_entry *table;
+                void *func_id;
         };
 };
 
@@ -49,7 +50,8 @@ struct l_table_entry {
 
 struct l_upvalue {
         struct l_upvalue *next;
-        int index;
+        void *id;
+        int number;
         struct l_object value;
 };
 
@@ -72,7 +74,7 @@ int load_function_bytecode(struct callbacks *cb, lua_State *L,
  * Takes the upvalue's number for use during deserialization at a later time.
  */
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                    int number);
+                                    void *id, int number);
 
 /**
  * Frees the memory allocated for a serialized upvalue.
@@ -83,8 +85,30 @@ void l_upvalue_free(struct l_upvalue *v);
  * Deserializes and sets an upvalue of a function. Expected the function to be
  * at func_index on the stack.
  */
-void push_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                  struct l_upvalue *upvalue);
+void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+                 struct l_upvalue *upvalue);
 
+/**
+ * Free upvalues on a list. List head pointer gets set to NULL.
+ */
+void destroy_upvalues(struct l_upvalue **head);
+
+/**
+ * Prepend a new upvalue to a list
+ */
+void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue);
+
+/**
+ * Find the upvalue with the give id
+ */
+struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id);
+
+/**
+ * Record where an upvalue was set, i.e. in what function, by adding an upvalue
+ * reference (a special upvalue that stores function id) to the list of
+ * references.
+ */
+void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
+                       void *func_id);
 
 #endif
