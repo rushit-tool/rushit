@@ -495,15 +495,20 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         return  0;
 }
 
+static void push_function(lua_State *L, void *func_id)
+{
+        lua_pushlightuserdata(L, func_id);
+        lua_rawget(L, LUA_REGISTRYINDEX);
+}
+
 /* Load a serialized hook function. Return a key to it in the registry. */
 static int load_hook(struct callbacks *cb, lua_State *L,
                      const struct script_hook *hook,
                      struct l_upvalue **upvalues,
                      void **key)
 {
-        struct l_upvalue *v1, *v2;
+        struct l_upvalue *v;
         void *hook_key;
-        int hook_idx;
         int err;
 
         if (!hook->bytecode)
@@ -512,34 +517,18 @@ static int load_hook(struct callbacks *cb, lua_State *L,
         err = load_function_bytecode(cb, L, hook->bytecode, hook->name);
         if (err)
                 return err;
-        hook_idx = lua_gettop(L);
         hook_key = (void *) lua_topointer(L, -1);
-
-        /* Set upvalues */
-        for (v1 = hook->upvalues; v1; v1 = v1->next) {
-                v2 = find_upvalue_by_id(upvalues, v1->id);
-                if (v2) {
-                        /* An already seen upvalue, we're sharing */
-                        lua_pushlightuserdata(L, v2->value.func_id);
-                        lua_rawget(L, LUA_REGISTRYINDEX);
-
-                        lua_upvaluejoin(L, hook_idx, v1->number,
-                                        -1, v2->number);
-
-                        lua_pop(L, 1);
-                } else {
-                        /* Upvalue seen for the first time */
-                        set_upvalue(cb, L, hook_idx, v1);
-                        record_upvalueref(upvalues, v1, hook_key);
-                }
-        }
-
-        /* TODO: Push globals */
 
         /* Keep a reference to the hook */
         lua_pushlightuserdata(L, hook_key);
         lua_insert(L, -2);
         lua_rawset(L, LUA_REGISTRYINDEX);
+
+        /* Set upvalues */
+        for (v = hook->upvalues; v; v = v->next)
+                set_shared_upvalue(cb, L, upvalues, push_function, hook_key, v);
+
+        /* TODO: Push globals */
 
         *key = hook_key;
         return 0;

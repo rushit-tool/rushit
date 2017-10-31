@@ -35,7 +35,7 @@ static void l_object_free_data(struct l_object *o);
 static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                              struct l_object *object);
 static void push_object(struct callbacks *cb, lua_State *L,
-                        struct l_object *object);
+                        const struct l_object *object);
 
 
 static void table_free(struct l_table_entry *table)
@@ -233,7 +233,7 @@ static void push_table(struct callbacks *cb, lua_State *L,
 }
 
 static void push_object(struct callbacks *cb, lua_State *L,
-                        struct l_object *object)
+                        const struct l_object *object)
 {
         switch (object->type) {
         case LUA_TBOOLEAN:
@@ -257,8 +257,8 @@ static void push_object(struct callbacks *cb, lua_State *L,
         }
 }
 
-void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                 struct l_upvalue *upvalue)
+static void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+                        const struct l_upvalue *upvalue)
 {
         const char *name;
 
@@ -292,7 +292,11 @@ void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
         *head = upvalue;
 }
 
-struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id)
+/**
+ * Looks through the list for an upvalue with the given id. Returns NULL if no
+ * match was found.
+ */
+static struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id)
 {
         struct l_upvalue *v;
 
@@ -324,8 +328,13 @@ static struct l_upvalue *create_upvalueref(const struct l_upvalue *upvalue,
 
 }
 
-void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
-                       void *func_id)
+/**
+ * Records where an upvalue was set, i.e. in what function, by adding an upvalue
+ * reference (a special upvalue that stores function id) to the list of
+ * references.
+ */
+static void record_upvalueref(struct l_upvalue **head,
+                              const struct l_upvalue *upvalue, void *func_id)
 {
         struct l_upvalue *v;
 
@@ -333,4 +342,26 @@ void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
 
         v = create_upvalueref(upvalue, func_id);
         prepend_upvalue(head, v);
+}
+
+void set_shared_upvalue(struct callbacks *cb, lua_State *L,
+                        struct l_upvalue **upvalue_cache,
+                        void (*get_func)(lua_State *L, void *func_id),
+                        void *func_id, const struct l_upvalue *upvalue)
+{
+        struct l_upvalue *v;
+
+        (*get_func)(L, func_id);
+        v = find_upvalue_by_id(upvalue_cache, upvalue->id);
+        if (v) {
+                /* An already seen upvalue, we're sharing */
+                (*get_func)(L, v->value.func_id);
+                lua_upvaluejoin(L, -2, upvalue->number, -1, v->number);
+                lua_pop(L, 1);
+        } else {
+                /* Upvalue seen for the first time */
+                set_upvalue(cb, L, lua_gettop(L), upvalue);
+                record_upvalueref(upvalue_cache, upvalue, func_id);
+        }
+        lua_pop(L, 1);
 }

@@ -77,11 +77,21 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                                     void *id, int number);
 
 /**
- * Deserializes and sets an upvalue of a function. Expects the function to be at
- * func_index on the stack.
+ * Deserializes an upvalue value and sets it as an upvalue of a function
+ * identified by func_id.
+ *
+ * Records each upvalue set for the first time in the cache together with the
+ * corresponding function identifier. If an upvalue has been deserialized
+ * before, it will be reused the next time it is encountered via
+ * lua_upvaluejoin().
+ *
+ * Takes a helper to retrive and push on stack a function by its identifier,
+ * implemented by the caller.
  */
-void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                 struct l_upvalue *upvalue);
+void set_shared_upvalue(struct callbacks *cb, lua_State *L,
+                        struct l_upvalue **upvalue_cache,
+                        void (*get_func)(lua_State *L, void *func_id),
+                        void *func_id, const struct l_upvalue *upvalue);
 
 /**
  * Frees a list of upvalues. List head pointer gets reset to NULL.
@@ -92,19 +102,5 @@ void destroy_upvalues(struct l_upvalue **head);
  * Inserts a given upvale at the begining of a list.
  */
 void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue);
-
-/**
- * Looks through the list for an upvalue with the given id. Returns NULL if no
- * match was found.
- */
-struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id);
-
-/**
- * Records where an upvalue was set, i.e. in what function, by adding an upvalue
- * reference (a special upvalue that stores function id) to the list of
- * references.
- */
-void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
-                       void *func_id);
 
 #endif
