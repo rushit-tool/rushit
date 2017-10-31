@@ -99,7 +99,6 @@ static void store_hook_upvalues(struct callbacks *cb, struct lua_State *L,
                                 struct script_hook *hook)
 {
         struct l_upvalue *upval;
-        const char *name;
         int i, top;
 
         assert(hook);
@@ -107,7 +106,7 @@ static void store_hook_upvalues(struct callbacks *cb, struct lua_State *L,
         destroy_upvalues(&hook->upvalues);
 
         top = lua_gettop(L);
-        for (i = 1; (name = lua_getupvalue(L, top, i)); i++) {
+        for (i = 1; lua_getupvalue(L, top, i); i++) {
                 upval = serialize_upvalue(cb, L, i);
                 prepend_upvalue(&hook->upvalues, upval);
                 lua_pop(L, 1);
