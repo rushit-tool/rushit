@@ -12,6 +12,8 @@
 -- * Get rid of open coded histogram generation. Introduce helpers.
 --
 
+local hist = {}
+
 client_socket(
   function (sockfd)
     assert(
@@ -20,8 +22,6 @@ client_socket(
                          SOF_TIMESTAMPING_TX_ACK,
                          SOF_TIMESTAMPING_OPT_TSONLY))
     )
-
-    hist = {}
   end
 )
 
