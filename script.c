@@ -556,14 +556,14 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
         h = script_engine_get_hook(ss->se, hid);
         L = ss->L;
 
-        if (!ss->hook_key[hid]) {
+        if (!ss->hook_keys[hid]) {
                 err = load_hook(ss->cb, L, h, &ss->hook_upvalues,
-                                &ss->hook_key[hid]);
+                                &ss->hook_keys[hid]);
                 if (err)
                         return err;
         }
 
-        lua_pushlightuserdata(L, ss->hook_key[hid]);
+        lua_pushlightuserdata(L, ss->hook_keys[hid]);
         lua_gettable(L, LUA_REGISTRYINDEX);
 
         return 0;
