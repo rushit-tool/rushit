@@ -499,12 +499,6 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
         return  0;
 }
 
-static void push_function(lua_State *L, void *func_id)
-{
-        lua_pushlightuserdata(L, func_id);
-        lua_rawget(L, LUA_REGISTRYINDEX);
-}
-
 /* Load a serialized hook function. Return a key to it in the registry. */
 static int load_hook(struct callbacks *cb, lua_State *L,
                      const struct script_hook *hook,
@@ -513,10 +507,13 @@ static int load_hook(struct callbacks *cb, lua_State *L,
 {
         struct l_upvalue *v;
         void *hook_key;
+        int cache_idx;
         int err;
 
         if (!hook->bytecode)
                 return -EHOOKEMPTY;
+
+        cache_idx = LUA_REGISTRYINDEX;
 
         err = load_function_bytecode(cb, L, hook->bytecode, hook->name);
         if (err)
@@ -526,11 +523,11 @@ static int load_hook(struct callbacks *cb, lua_State *L,
         /* Keep a reference to the hook */
         lua_pushlightuserdata(L, hook_key);
         lua_insert(L, -2);
-        lua_rawset(L, LUA_REGISTRYINDEX);
+        lua_rawset(L, cache_idx);
 
         /* Set upvalues */
         for (v = hook->upvalues; v; v = v->next)
-                set_shared_upvalue(cb, L, upvalues, push_function, hook_key, v);
+                set_shared_upvalue(cb, L, upvalues, cache_idx, hook_key, v);
 
         /* TODO: Push globals */
 

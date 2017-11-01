@@ -79,18 +79,15 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
  * Deserializes an upvalue value and sets it as an upvalue of a function
  * identified by func_id.
  *
- * Records each upvalue set for the first time in the cache together with the
- * corresponding function identifier. If an upvalue has been deserialized
+ * Records each upvalue deserialized for the first time in the cache table
+ * located at given index on the stack. If an upvalue has been deserialized
  * before, it will be reused the next time it is encountered via
  * lua_upvaluejoin().
- *
- * Takes a helper to retrive and push on stack a function by its identifier,
- * implemented by the caller.
  */
 void set_shared_upvalue(struct callbacks *cb, lua_State *L,
                         struct upvalue_cache *upvalue_cache,
-                        void (*get_func)(lua_State *L, void *func_id),
-                        void *func_id, const struct l_upvalue *upvalue);
+                        int cache_idx, void *func_id,
+                        const struct l_upvalue *upvalue);
 
 /**
  * Frees a list of upvalues. List head pointer gets reset to NULL.

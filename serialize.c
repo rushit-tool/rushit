@@ -399,19 +399,25 @@ void upvalue_cache_free(struct upvalue_cache *c)
         }
 }
 
+static void get_cached_object(lua_State *L, int cache_idx, void *obj_id)
+{
+        lua_pushlightuserdata(L, obj_id);
+        lua_rawget(L, cache_idx);
+}
+
 void set_shared_upvalue(struct callbacks *cb, lua_State *L,
                         struct upvalue_cache *upvalue_cache,
-                        void (*get_func)(lua_State *L, void *func_id),
-                        void *func_id, const struct l_upvalue *upvalue)
+                        int cache_idx, void *func_id,
+                        const struct l_upvalue *upvalue)
 {
         struct l_upvalue **head = &upvalue_cache->head;
         struct l_upvalue *v;
 
-        (*get_func)(L, func_id);
+        get_cached_object(L, cache_idx, func_id);
         v = find_upvalue_by_id(head, upvalue->id);
         if (v) {
                 /* An already seen upvalue, we're sharing */
-                (*get_func)(L, v->value.func_id);
+                get_cached_object(L, cache_idx, v->value.func_id);
                 lua_upvaluejoin(L, -2, upvalue->number, -1, v->number);
                 lua_pop(L, 1);
         } else {
