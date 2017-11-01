@@ -286,13 +286,14 @@ static void map_object(struct upvalue_cache *cache, void *key,
         cache->object_map = m;
 }
 
-static void *lookup_object(struct upvalue_cache *cache, void *key)
+static const struct object_mapping *lookup_object(struct upvalue_cache *cache,
+                                                  void *key)
 {
         struct object_mapping *m;
 
         for (m = cache->object_map; m; m = m->next) {
                 if (m->key == key)
-                        return m->object_id;
+                        return m;
         }
         return NULL;
 }
@@ -338,12 +339,12 @@ static void push_object(struct callbacks *cb, lua_State *L,
                         struct upvalue_cache *cache,
                         const struct l_object *object)
 {
-        void *id;
+        const struct object_mapping *m;
 
         if (object->type == LUA_TTABLE) {
-                id = lookup_object(cache, object->table->id);
-                if (id) {
-                        fetch_object(cache, L, id);
+                m = lookup_object(cache, object->table->id);
+                if (m) {
+                        fetch_object(cache, L, m->object_id);
                         return;
                 }
         }
