@@ -602,6 +602,85 @@ static void t_hooks_share_table_upvalues(void **state)
         assert_return_code(r, -r);
 }
 
+static void t_hook_can_access_table_referencing_table(void **state)
+{
+        const char *script =
+                "local t1 = { 42 };"
+                "local t2 = { t1 };"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(t2[1][1], 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+
+}
+
+static void t_hook_can_access_table_referencing_function(void **state)
+{
+        const char *script =
+                "local function f() return 42 end;"
+                "local t = { f };"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(t[1](), 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_tables_that_are_not_upvalues_are_shared(void **state)
+{
+        /* t1 is an upvalue for client_close hook.
+         * t2 is an upvalue for client_socket hook.
+         * t2 references t1, so both hooks should see the same value. */
+        const char *script =
+                "local t1 = { 0 };"
+                "local t2 = { t1 };"
+                "client_socket("
+                "  function ()"
+                "    t2[1][1] = 42;"
+                "    return 0;"
+                "  end"
+                ");"
+                "client_close("
+                "  function ()"
+                "    " lua_assert_equal(t1[1], 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_close_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
 #define clinet_engine_unit_test(f) \
         cmocka_unit_test_setup_teardown((f), client_engine_setup, client_engine_teardown)
 #define client_slave_unit_test(f) \
@@ -630,6 +709,9 @@ int main(void)
                 client_slave_unit_test(t_upvalues_dont_get_reset),
                 client_slave_unit_test(t_hooks_share_basic_upvalues),
                 client_slave_unit_test(t_hooks_share_table_upvalues),
+                client_slave_unit_test(t_hook_can_access_table_referencing_table),
+                client_slave_unit_test(t_hook_can_access_table_referencing_function),
+                client_slave_unit_test(t_tables_that_are_not_upvalues_are_shared),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);
