@@ -188,12 +188,12 @@ int load_function_bytecode(struct callbacks *cb, lua_State *L,
 }
 
 static struct l_table_entry *dump_table_entries(struct callbacks *cb,
-                                                lua_State *L, int index)
+                                                lua_State *L)
 {
         struct l_table_entry *head = NULL;
 
         lua_pushnil(L);
-        while (lua_next(L, index)) {
+        while (lua_next(L, -2)) {
                 struct l_table_entry *e = calloc(1, sizeof(*e));
                 if (!e)
                         LOG_FATAL(cb, "calloc failed");
@@ -209,16 +209,15 @@ static struct l_table_entry *dump_table_entries(struct callbacks *cb,
         return head;
 }
 
-static struct l_table *serialize_table(struct callbacks *cb, lua_State *L,
-                                       int index)
+static struct l_table *serialize_table(struct callbacks *cb, lua_State *L)
 {
         struct l_table *t;
 
         t = calloc(1, sizeof(*t));
         assert(t);
 
-        t->id = (void *) lua_topointer(L, index);
-        t->entries = dump_table_entries(cb, L, index);
+        t->id = (void *) lua_topointer(L, -1);
+        t->entries = dump_table_entries(cb, L);
 
         return t;
 }
@@ -226,26 +225,23 @@ static struct l_table *serialize_table(struct callbacks *cb, lua_State *L,
 static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object)
 {
-        int index;
-
-        index = lua_gettop(L);
-        object->type = lua_type(L, index);
+        object->type = lua_type(L, -1);
 
         switch (object->type) {
         case LUA_TNIL:
                 assert(false);
                 break;
         case LUA_TNUMBER:
-                object->number = lua_tonumber(L, index);
+                object->number = lua_tonumber(L, -1);
                 break;
         case LUA_TBOOLEAN:
-                object->boolean = lua_toboolean(L, index);
+                object->boolean = lua_toboolean(L, -1);
                 break;
         case LUA_TSTRING:
-                object->string = strdup(lua_tostring(L, index));
+                object->string = strdup(lua_tostring(L, -1));
                 break;
         case LUA_TTABLE:
-                object->table = serialize_table(cb, L, index);
+                object->table = serialize_table(cb, L);
                 break;
         case LUA_TFUNCTION:
                 object->function = dump_function_bytecode(cb, L);
