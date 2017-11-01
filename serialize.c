@@ -464,7 +464,7 @@ struct upvalue_cache *upvalue_cache_new(void)
         return calloc(1, sizeof(struct upvalue_cache));
 }
 
-static void destroy_mappings(struct object_mapping *m)
+static void destroy_object_map(struct object_mapping *m)
 {
         struct object_mapping *m_next;
 
@@ -479,7 +479,7 @@ void upvalue_cache_free(struct upvalue_cache *c)
 {
         if (c) {
                 destroy_upvalues(&c->head);
-                destroy_mappings(c->object_map);
+                destroy_object_map(c->object_map);
                 free(c);
         }
 }
