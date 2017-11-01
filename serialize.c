@@ -43,7 +43,7 @@ struct upvalue_cache {
 
 
 static void l_object_free_data(struct l_object *o);
-static void serialize_object(struct callbacks *cb, lua_State *L, int index,
+static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object);
 static void push_object(struct callbacks *cb, lua_State *L,
                         const struct l_object *object);
@@ -161,28 +161,30 @@ static struct l_table_entry *dump_table_entries(struct callbacks *cb,
                                                 lua_State *L, int index)
 {
         struct l_table_entry *head = NULL;
-        int tbl_idx;
 
-        tbl_idx = lua_gettop(L);
         lua_pushnil(L);
-        while (lua_next(L, tbl_idx)) {
+        while (lua_next(L, index)) {
                 struct l_table_entry *e = calloc(1, sizeof(*e));
                 if (!e)
                         LOG_FATAL(cb, "calloc failed");
                 e->next = head;
                 head = e;
 
-                serialize_object(cb, L, -2, &e->key);
-                serialize_object(cb, L, -1, &e->value);
+                serialize_object(cb, L, &e->value);
                 lua_pop(L, 1);
+                serialize_object(cb, L, &e->key);
+                /* leave key on stack */
         }
 
         return head;
 }
 
-static void serialize_object(struct callbacks *cb, lua_State *L, int index,
+static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object)
 {
+        int index;
+
+        index = lua_gettop(L);
         object->type = lua_type(L, index);
 
         switch (object->type) {
@@ -202,7 +204,6 @@ static void serialize_object(struct callbacks *cb, lua_State *L, int index,
                 object->table = dump_table_entries(cb, L, index);
                 break;
         case LUA_TFUNCTION:
-                assert(index == -1); /* Not supported */
                 object->function = dump_function_bytecode(cb, L);
                 break;
         case LUA_TUSERDATA:
@@ -225,7 +226,7 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
         struct l_upvalue *v;
 
         v = l_upvalue_new(id, number);
-        serialize_object(cb, L, -1, &v->value);
+        serialize_object(cb, L, &v->value);
 
         return v;
 }
