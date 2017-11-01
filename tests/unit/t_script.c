@@ -394,48 +394,70 @@ static void t_pass_args_to_packet_hook(void **state)
         assert_int_equal(r, 0);
 }
 
-static void t_run_hook_with_one_primitive_upvalue(void **state)
+static void t_run_hook_with_boolean_upvalue(void **state)
 {
-        const char *script[] = {
-                /* boolean */
+        const char *script =
                 "local flag = true;"
                 "client_socket("
                 "  function ()"
                 "    " lua_assert_true(flag)
                 "    return 0;"
                 "  end"
-                ")",
-                /* number */
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_run_hook_with_number_upvalue(void **state)
+{
+        const char *script =
                 "local number = 42;"
                 "client_socket("
                 "  function ()"
                 "    " lua_assert_equal(number, 42)
                 "    return 0;"
                 "  end"
-                ")",
-                /* string */
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_run_hook_with_string_upvalue(void **state)
+{
+        const char *script =
                 "local string = 'foo';"
                 "client_socket("
                 "  function ()"
                 "    " lua_assert_equal(string, 'foo')
                 "    return 0;"
                 "  end"
-                ")",
-        };
+                ");";
         struct script_slave *ss = *state;
         struct script_engine *se = ss->se;
-        int i, r;
+        int r;
 
-        for (i = 0; i < ARRAY_SIZE(script); i++) {
-                r = script_engine_run_string(se, script[i], NULL, NULL);
-                assert_return_code(r, -r);
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
 
-                r = script_slave_socket_hook(ss, -1, NULL);
-                assert_return_code(r, -r);
-        }
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
 }
 
-static void t_run_hook_with_multiple_upvalues(void **state)
+static void t_run_hook_with_multiple_primitive_upvalues(void **state)
 {
         const char *script =
                 "local flag = true;"
@@ -702,8 +724,10 @@ int main(void)
                 client_slave_unit_test(t_run_recverr_hook),
                 client_slave_unit_test(t_pass_args_to_socket_hook),
                 client_slave_unit_test(t_pass_args_to_packet_hook),
-                client_slave_unit_test(t_run_hook_with_one_primitive_upvalue),
-                client_slave_unit_test(t_run_hook_with_multiple_upvalues),
+                client_slave_unit_test(t_run_hook_with_boolean_upvalue),
+                client_slave_unit_test(t_run_hook_with_number_upvalue),
+                client_slave_unit_test(t_run_hook_with_string_upvalue),
+                client_slave_unit_test(t_run_hook_with_multiple_primitive_upvalues),
                 client_slave_unit_test(t_run_hook_with_function_upvalue),
                 client_slave_unit_test(t_run_hook_with_table_of_primitive_values_upvalue),
                 client_slave_unit_test(t_upvalues_dont_get_reset),
