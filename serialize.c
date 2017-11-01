@@ -37,6 +37,11 @@ struct l_table_entry {
         struct l_object value;
 };
 
+struct l_table {
+        void *id;
+        struct l_table_entry *entries;
+};
+
 struct upvalue_cache {
         struct l_upvalue *head;
 };
@@ -49,18 +54,29 @@ static void push_object(struct callbacks *cb, lua_State *L,
                         const struct l_object *object);
 
 
-static void table_free(struct l_table_entry *table)
+static void table_entry_free(struct l_table_entry *e)
 {
-        struct l_table_entry *next;
+        l_object_free_data(&e->key);
+        l_object_free_data(&e->value);
+        free(e);
+}
 
-        while (table) {
-                next = table->next;
+static void table_free_entries(struct l_table_entry *e)
+{
+        struct l_table_entry *e_next;
 
-                l_object_free_data(&table->key);
-                l_object_free_data(&table->value);
-                free(table);
+        while (e) {
+                e_next = e->next;
+                table_entry_free(e);
+                e = e_next;
+        }
+}
 
-                table = next;
+static void table_free(struct l_table *t)
+{
+        if (t) {
+                table_free_entries(t->entries);
+                free(t);
         }
 }
 
@@ -179,6 +195,20 @@ static struct l_table_entry *dump_table_entries(struct callbacks *cb,
         return head;
 }
 
+static struct l_table *serialize_table(struct callbacks *cb, lua_State *L,
+                                       int index)
+{
+        struct l_table *t;
+
+        t = calloc(1, sizeof(*t));
+        assert(t);
+
+        t->id = (void *) lua_topointer(L, index);
+        t->entries = dump_table_entries(cb, L, index);
+
+        return t;
+}
+
 static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object)
 {
@@ -201,7 +231,7 @@ static void serialize_object(struct callbacks *cb, lua_State *L,
                 object->string = strdup(lua_tostring(L, index));
                 break;
         case LUA_TTABLE:
-                object->table = dump_table_entries(cb, L, index);
+                object->table = serialize_table(cb, L, index);
                 break;
         case LUA_TFUNCTION:
                 object->function = dump_function_bytecode(cb, L);
@@ -232,12 +262,12 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
 }
 
 static void push_table(struct callbacks *cb, lua_State *L,
-                       struct l_table_entry *table)
+                       struct l_table *table)
 {
         struct l_table_entry *e;
 
         lua_newtable(L);
-        for (e = table; e; e = e->next) {
+        for (e = table->entries; e; e = e->next) {
                 push_object(cb, L, &e->key);
                 push_object(cb, L, &e->value);
                 lua_rawset(L, -3);
