@@ -63,25 +63,6 @@ static struct script_hook *script_engine_put_hook(struct script_hook *hook)
 }
 DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
 
-static void hook_set_bytecode(struct script_hook *h, struct byte_array *bytecode)
-{
-        assert(h);
-
-        byte_array_free(h->bytecode);
-        h->bytecode = bytecode;
-}
-
-static int store_hook_bytecode(struct callbacks *cb, lua_State *L,
-                               struct script_hook *hook)
-{
-        struct byte_array *code;
-
-        code = dump_function_bytecode(cb, L);
-        hook_set_bytecode(hook, code);
-
-        return 0;
-}
-
 static struct script_engine *get_context(lua_State *L)
 {
         struct script_engine *se;
@@ -120,7 +101,6 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         struct script_engine *se;
-        int rc = 0;
 
         /* Expect a function argument */
         luaL_checktype(L, 1, LUA_TFUNCTION);
@@ -128,11 +108,13 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
         se = get_context(L);
         if (se->run_mode == run_mode) {
                 h = script_engine_get_hook(se, hid);
+                if (h->function)
+                        LOG_FATAL(se->cb, "hook %s already set", h->name);
+                h->function = serialize_function(se->cb, L);
                 store_hook_upvalues(se->cb, L, h);
-                rc = store_hook_bytecode(se->cb, L, h);
         }
 
-        return rc;
+        return 0;
 }
 
 static int client_socket_cb(lua_State *L)
@@ -317,7 +299,7 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         se->L = NULL;
 
         for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++) {
-                byte_array_free(h->bytecode);
+                l_function_free(h->function);
                 destroy_upvalues(&h->upvalues);
         }
 
@@ -510,12 +492,12 @@ static int load_hook(struct callbacks *cb, lua_State *L,
         int cache_idx;
         int err;
 
-        if (!hook->bytecode)
+        if (!hook->function)
                 return -EHOOKEMPTY;
 
         cache_idx = LUA_REGISTRYINDEX;
 
-        err = load_function_bytecode(cb, L, hook->bytecode, hook->name);
+        err = deserialize_function(cb, L, hook->function, hook->name);
         if (err)
                 return err;
         hook_key = (void *) lua_topointer(L, -1);

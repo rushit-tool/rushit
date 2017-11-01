@@ -37,6 +37,12 @@ struct l_table {
         struct l_table_entry *entries;
 };
 
+struct l_function {
+        void *id;
+        struct byte_array *code;
+        struct l_upvalue *upvalues;
+};
+
 struct upvalue_mapping {
         struct upvalue_mapping *next;
         void *key;
@@ -141,6 +147,14 @@ static void l_upvalue_free(struct l_upvalue *v)
         free(v);
 }
 
+void l_function_free(struct l_function *f)
+{
+        if (f) {
+                byte_array_free(f->code);
+                free(f);
+        }
+}
+
 static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
 {
         UNUSED(L);
@@ -148,7 +162,8 @@ static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
         return 0;
 }
 
-struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L)
+static struct byte_array *dump_function_bytecode(struct callbacks *cb,
+                                                 lua_State *L)
 {
         struct byte_array *code;
         const char *buf;
@@ -171,9 +186,9 @@ struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L)
         return code;
 }
 
-int load_function_bytecode(struct callbacks *cb, lua_State *L,
-                           const struct byte_array *bytecode,
-                           const char *name)
+static int load_function_bytecode(struct callbacks *cb, lua_State *L,
+                                  const struct byte_array *bytecode,
+                                  const char *name)
 {
         int err;
 
@@ -220,6 +235,19 @@ static struct l_table *serialize_table(struct callbacks *cb, lua_State *L)
         t->entries = dump_table_entries(cb, L);
 
         return t;
+}
+
+struct l_function *serialize_function(struct callbacks *cb, lua_State *L)
+{
+        struct l_function *f;
+
+        f = calloc(1, sizeof(*f));
+        assert(f);
+
+        f->id = (void *) lua_topointer(L, -1);
+        f->code = dump_function_bytecode(cb, L);
+
+        return f;
 }
 
 static void serialize_object(struct callbacks *cb, lua_State *L,
@@ -359,6 +387,12 @@ static void push_table(struct callbacks *cb, lua_State *L,
                 push_object(cb, L, cache, &e->value);
                 lua_rawset(L, -3);
         }
+}
+
+int deserialize_function(struct callbacks *cb, lua_State *L,
+                         struct l_function *func, const char *name)
+{
+        return load_function_bytecode(cb, L, func->code, name);
 }
 
 static void push_object(struct callbacks *cb, lua_State *L,

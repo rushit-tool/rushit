@@ -56,7 +56,7 @@ enum script_hook_id {
 
 struct script_hook {
         const char *name;
-        struct byte_array *bytecode;
+        struct l_function *function;
         struct l_upvalue *upvalues;
 };
 

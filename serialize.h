@@ -48,24 +48,27 @@ struct l_upvalue {
         struct l_object value;
 };
 
+struct l_function;
 struct upvalue_cache;
 
 
 struct upvalue_cache * upvalue_cache_new(void);
 void upvalue_cache_free(struct upvalue_cache *c);
 
+void l_function_free(struct l_function *f);
+
 /**
  * Serializes the Lua function at the top of the stack. Just the function code
  * without its upvalues.
  */
-struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L);
+struct l_function *serialize_function(struct callbacks *cb, lua_State *L);
 
 /**
  * Deserializes the function and leaves it on top the stack. Function upvalues
  * have to be set separately.
  */
-int load_function_bytecode(struct callbacks *cb, lua_State *L,
-                           const struct byte_array *bytecode, const char *name);
+int deserialize_function(struct callbacks *cb, lua_State *L,
+                         struct l_function *func, const char *name);
 
 /**
  * Serializes an upvalue. Expects the upvalue to be at the top of the stack.
