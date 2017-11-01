@@ -299,13 +299,13 @@ static void push_object(struct callbacks *cb, lua_State *L,
         }
 }
 
-static void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
+static void set_upvalue(struct callbacks *cb, lua_State *L,
                         const struct l_upvalue *upvalue)
 {
         const char *name;
 
         push_object(cb, L, &upvalue->value);
-        name = lua_setupvalue(L, func_index, upvalue->number);
+        name = lua_setupvalue(L, -2, upvalue->number);
         assert(name);
 }
 
@@ -422,7 +422,7 @@ void set_shared_upvalue(struct callbacks *cb, lua_State *L,
                 lua_pop(L, 1);
         } else {
                 /* Upvalue seen for the first time */
-                set_upvalue(cb, L, lua_gettop(L), upvalue);
+                set_upvalue(cb, L, upvalue);
                 record_upvalueref(head, upvalue, func_id);
         }
         lua_pop(L, 1);
