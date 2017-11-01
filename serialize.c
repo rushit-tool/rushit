@@ -565,8 +565,6 @@ static void set_shared_upvalue(struct callbacks *cb, lua_State *L,
 {
         const struct upvalue_mapping *m;
 
-        upvalue_cache->object_tbl_idx = cache_idx;
-
         m = lookup_upvalue(upvalue_cache, upvalue->id);
         if (m) {
                 /* An already seen upvalue, we're sharing */
@@ -583,22 +581,33 @@ static void set_shared_upvalue(struct callbacks *cb, lua_State *L,
 
 int deserialize_function(struct callbacks *cb, lua_State *L,
                          struct upvalue_cache *cache, int cache_idx,
-                         const struct l_function *func, const char *name)
+                         const struct l_function *func, const char *name,
+                         void **object_key)
 {
         struct l_upvalue *v;
         void *func_id;
         int err;
 
+        assert(cache);
+        assert(func);
+        assert(object_key);
+
+        cache->object_tbl_idx = cache_idx;
+
         err = load_function_bytecode(cb, L, func->code, name);
         if (err)
                 return err;
-        func_id = (void *) lua_topointer(L, -1);
+
+        func_id = cache_object(cache, L);
+        map_object(cache, func->id, func_id);
 
         /* Set upvalues */
         for (v = func->upvalues; v; v = v->next)
                 set_shared_upvalue(cb, L, cache, cache_idx, func_id, v);
 
         /* TODO: Push globals */
+
+        *object_key = func_id;
 
         return 0;
 }

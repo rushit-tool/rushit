@@ -464,27 +464,11 @@ static int load_hook(struct callbacks *cb, lua_State *L,
                      struct upvalue_cache *upvalues,
                      void **key)
 {
-        void *hook_key;
-        int cache_idx;
-        int err;
-
         if (!hook->function)
                 return -EHOOKEMPTY;
 
-        cache_idx = LUA_REGISTRYINDEX;
-        err = deserialize_function(cb, L, upvalues, cache_idx,
-                                   hook->function, hook->name);
-        if (err)
-                return err;
-        hook_key = (void *) lua_topointer(L, -1);
-
-        /* Keep a reference to the hook */
-        lua_pushlightuserdata(L, hook_key);
-        lua_insert(L, -2);
-        lua_rawset(L, cache_idx);
-
-        *key = hook_key;
-        return 0;
+        return deserialize_function(cb, L, upvalues, LUA_REGISTRYINDEX,
+                                    hook->function, hook->name, key);
 }
 
 static int push_hook(struct script_slave *ss, enum script_hook_id hid)

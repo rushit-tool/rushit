@@ -52,6 +52,7 @@ struct l_function *serialize_function(struct callbacks *cb, lua_State *L);
  */
 int deserialize_function(struct callbacks *cb, lua_State *L,
                          struct upvalue_cache *cache, int cache_idx,
-                         const struct l_function *func, const char *name);
+                         const struct l_function *func, const char *name,
+                         void **object_key);
 
 #endif
