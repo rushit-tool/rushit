@@ -38,7 +38,6 @@ struct l_object {
                 char *string;
                 struct byte_array *function;
                 struct l_table *table;
-                void *func_id;
         };
 };
 

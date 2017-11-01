@@ -26,11 +26,6 @@
 #include "script.h"
 
 
-enum {
-        XLUA_TUPVALUEREF = -1,
-};
-
-
 struct l_table_entry {
         struct l_table_entry *next;
         struct l_object key;
@@ -42,6 +37,13 @@ struct l_table {
         struct l_table_entry *entries;
 };
 
+struct upvalue_mapping {
+        struct upvalue_mapping *next;
+        void *key;
+        void *function_id;
+        int upvalue_num;
+};
+
 struct object_mapping {
         struct object_mapping *next;
         void *key;
@@ -49,7 +51,9 @@ struct object_mapping {
 };
 
 struct upvalue_cache {
-        struct l_upvalue *head;
+        /* Map of serialized upvalue ids to deserialized (function id, upvalue
+         * number) tuples */
+        struct upvalue_mapping *upvalue_map;
         /* Map of serialized object ids to deserialized object ids */
         struct object_mapping *object_map;
         /* Lua store for deserialized objects indexed by their id */
@@ -99,7 +103,6 @@ static void l_object_free_data(struct l_object *o)
         switch (o->type) {
         case LUA_TBOOLEAN:
         case LUA_TNUMBER:
-        case XLUA_TUPVALUEREF:
                 /* nothing to do */
                 break;
         case LUA_TSTRING:
@@ -316,6 +319,33 @@ static void fetch_object(struct upvalue_cache *cache, lua_State *L, void *id)
         lua_rawget(L, cache->object_tbl_idx);
 }
 
+static void map_upvalue(struct upvalue_cache *cache, void *key,
+                        void *function_id, int upvalue_num)
+{
+        struct upvalue_mapping *m;
+
+        m = calloc(1, sizeof(*m));
+        assert(m);
+        m->key = key;
+        m->function_id = function_id;
+        m->upvalue_num = upvalue_num;
+
+        m->next = cache->upvalue_map;
+        cache->upvalue_map = m;
+}
+
+static const struct upvalue_mapping *lookup_upvalue(struct upvalue_cache *cache,
+                                                    void *key)
+{
+        struct upvalue_mapping *m;
+
+        for (m = cache->upvalue_map; m; m = m->next) {
+                if (m->key == key)
+                        return m;
+        }
+        return NULL;
+}
+
 static void push_table(struct callbacks *cb, lua_State *L,
                        struct upvalue_cache *cache,
                        struct l_table *table)
@@ -407,58 +437,6 @@ void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
         *head = upvalue;
 }
 
-/**
- * Looks through the list for an upvalue with the given id. Returns NULL if no
- * match was found.
- */
-static struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id)
-{
-        struct l_upvalue *v;
-
-        assert(head);
-
-        for (v = *head; v; v = v->next) {
-                if (v->id == id)
-                        return v;
-        }
-
-        return NULL;
-}
-
-static void init_upvalueref(struct l_object *obj, void *func_id)
-{
-        obj->type = XLUA_TUPVALUEREF;
-        obj->func_id = func_id;
-}
-
-static struct l_upvalue *create_upvalueref(const struct l_upvalue *upvalue,
-                                           void *func_id)
-{
-        struct l_upvalue *v;
-
-        v = l_upvalue_new(upvalue->id, upvalue->number);
-        init_upvalueref(&v->value, func_id);
-
-        return v;
-
-}
-
-/**
- * Records where an upvalue was set, i.e. in what function, by adding an upvalue
- * reference (a special upvalue that stores function id) to the list of
- * references.
- */
-static void record_upvalueref(struct l_upvalue **head,
-                              const struct l_upvalue *upvalue, void *func_id)
-{
-        struct l_upvalue *v;
-
-        assert(head);
-
-        v = create_upvalueref(upvalue, func_id);
-        prepend_upvalue(head, v);
-}
-
 struct upvalue_cache *upvalue_cache_new(void)
 {
         return calloc(1, sizeof(struct upvalue_cache));
@@ -475,11 +453,22 @@ static void destroy_object_map(struct object_mapping *m)
         }
 }
 
+static void destroy_upvalue_map(struct upvalue_mapping *m)
+{
+        struct upvalue_mapping *m_next;
+
+        while (m) {
+                m_next = m->next;
+                free(m);
+                m = m_next;
+        }
+}
+
 void upvalue_cache_free(struct upvalue_cache *c)
 {
         if (c) {
-                destroy_upvalues(&c->head);
                 destroy_object_map(c->object_map);
+                destroy_upvalue_map(c->upvalue_map);
                 free(c);
         }
 }
@@ -495,22 +484,22 @@ void set_shared_upvalue(struct callbacks *cb, lua_State *L,
                         int cache_idx, void *func_id,
                         const struct l_upvalue *upvalue)
 {
-        struct l_upvalue **head = &upvalue_cache->head;
-        struct l_upvalue *v;
+        const struct upvalue_mapping *m;
 
         upvalue_cache->object_tbl_idx = cache_idx;
 
         get_cached_object(L, cache_idx, func_id);
-        v = find_upvalue_by_id(head, upvalue->id);
-        if (v) {
+        m = lookup_upvalue(upvalue_cache, upvalue->id);
+        if (m) {
                 /* An already seen upvalue, we're sharing */
-                get_cached_object(L, cache_idx, v->value.func_id);
-                lua_upvaluejoin(L, -2, upvalue->number, -1, v->number);
+                get_cached_object(L, cache_idx, m->function_id);
+                lua_upvaluejoin(L, -2, upvalue->number, -1, m->upvalue_num);
                 lua_pop(L, 1);
         } else {
                 /* Upvalue seen for the first time */
                 set_upvalue(cb, L, upvalue_cache, upvalue);
-                record_upvalueref(head, upvalue, func_id);
+                map_upvalue(upvalue_cache, upvalue->id,
+                            func_id, upvalue->number);
         }
         lua_pop(L, 1);
 }
