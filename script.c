@@ -76,26 +76,6 @@ static struct script_engine *get_context(lua_State *L)
         return se;
 }
 
-static void store_hook_upvalues(struct callbacks *cb, struct lua_State *L,
-                                struct script_hook *hook)
-{
-        struct l_upvalue *upval;
-        int i, top;
-        void *id;
-
-        assert(hook);
-
-        destroy_upvalues(&hook->upvalues);
-
-        top = lua_gettop(L);
-        for (i = 1; lua_getupvalue(L, top, i); i++) {
-                id = lua_upvalueid(L, top, i);
-                upval = serialize_upvalue(cb, L, id, i);
-                prepend_upvalue(&hook->upvalues, upval);
-                lua_pop(L, 1);
-        }
-}
-
 static int store_hook(lua_State *L, enum run_mode run_mode,
                       enum script_hook_id hid)
 {
@@ -111,7 +91,6 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
                 if (h->function)
                         LOG_FATAL(se->cb, "hook %s already set", h->name);
                 h->function = serialize_function(se->cb, L);
-                store_hook_upvalues(se->cb, L, h);
         }
 
         return 0;
@@ -298,10 +277,8 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         lua_close(se->L);
         se->L = NULL;
 
-        for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++) {
+        for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++)
                 l_function_free(h->function);
-                destroy_upvalues(&h->upvalues);
-        }
 
         free(se);
         return NULL;
@@ -487,7 +464,6 @@ static int load_hook(struct callbacks *cb, lua_State *L,
                      struct upvalue_cache *upvalues,
                      void **key)
 {
-        struct l_upvalue *v;
         void *hook_key;
         int cache_idx;
         int err;
@@ -496,8 +472,8 @@ static int load_hook(struct callbacks *cb, lua_State *L,
                 return -EHOOKEMPTY;
 
         cache_idx = LUA_REGISTRYINDEX;
-
-        err = deserialize_function(cb, L, hook->function, hook->name);
+        err = deserialize_function(cb, L, upvalues, cache_idx,
+                                   hook->function, hook->name);
         if (err)
                 return err;
         hook_key = (void *) lua_topointer(L, -1);
@@ -506,12 +482,6 @@ static int load_hook(struct callbacks *cb, lua_State *L,
         lua_pushlightuserdata(L, hook_key);
         lua_insert(L, -2);
         lua_rawset(L, cache_idx);
-
-        /* Set upvalues */
-        for (v = hook->upvalues; v; v = v->next)
-                set_shared_upvalue(cb, L, upvalues, cache_idx, hook_key, v);
-
-        /* TODO: Push globals */
 
         *key = hook_key;
         return 0;

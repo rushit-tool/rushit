@@ -30,24 +30,6 @@
 
 struct callbacks;
 
-struct l_object {
-        int type;
-        union {
-                bool boolean;
-                lua_Number number;
-                char *string;
-                struct byte_array *function;
-                struct l_table *table;
-        };
-};
-
-struct l_upvalue {
-        struct l_upvalue *next;
-        void *id;
-        int number;
-        struct l_object value;
-};
-
 struct l_function;
 struct upvalue_cache;
 
@@ -58,47 +40,18 @@ void upvalue_cache_free(struct upvalue_cache *c);
 void l_function_free(struct l_function *f);
 
 /**
- * Serializes the Lua function at the top of the stack. Just the function code
- * without its upvalues.
+ * Serializes the Lua function at the top of the stack.
  */
 struct l_function *serialize_function(struct callbacks *cb, lua_State *L);
 
 /**
- * Deserializes the function and leaves it on top the stack. Function upvalues
- * have to be set separately.
+ * Deserializes the function and leaves it on top the stack.
+ *
+ * Caches the deserialized objects so that they can be shared with other
+ * deserialized functions.
  */
 int deserialize_function(struct callbacks *cb, lua_State *L,
-                         struct l_function *func, const char *name);
-
-/**
- * Serializes an upvalue. Expects the upvalue to be at the top of the stack.
- * Takes the upvalue's number for use during deserialization at a later time.
- */
-struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                    void *id, int number);
-
-/**
- * Deserializes an upvalue value and sets it as an upvalue of a function
- * identified by func_id.
- *
- * Records each upvalue deserialized for the first time in the cache table
- * located at given index on the stack. If an upvalue has been deserialized
- * before, it will be reused the next time it is encountered via
- * lua_upvaluejoin().
- */
-void set_shared_upvalue(struct callbacks *cb, lua_State *L,
-                        struct upvalue_cache *upvalue_cache,
-                        int cache_idx, void *func_id,
-                        const struct l_upvalue *upvalue);
-
-/**
- * Frees a list of upvalues. List head pointer gets reset to NULL.
- */
-void destroy_upvalues(struct l_upvalue **head);
-
-/**
- * Inserts a given upvale at the begining of a list.
- */
-void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue);
+                         struct upvalue_cache *cache, int cache_idx,
+                         const struct l_function *func, const char *name);
 
 #endif

@@ -25,6 +25,23 @@
 #include "logging.h"
 #include "script.h"
 
+struct l_object {
+        int type;
+        union {
+                bool boolean;
+                lua_Number number;
+                char *string;
+                struct byte_array *function;
+                struct l_table *table;
+        };
+};
+
+struct l_upvalue {
+        struct l_upvalue *next;
+        void *id;
+        int number;
+        struct l_object value;
+};
 
 struct l_table_entry {
         struct l_table_entry *next;
@@ -147,10 +164,30 @@ static void l_upvalue_free(struct l_upvalue *v)
         free(v);
 }
 
+/**
+ * Frees a list of upvalues. List head pointer gets reset to NULL.
+ */
+void destroy_upvalues(struct l_upvalue **head)
+{
+        struct l_upvalue *v, *v_next;
+
+        assert(head);
+
+        v = *head;
+        *head = NULL;
+
+        while (v) {
+                v_next = v->next;
+                l_upvalue_free(v);
+                v = v_next;
+        }
+}
+
 void l_function_free(struct l_function *f)
 {
         if (f) {
                 byte_array_free(f->code);
+                destroy_upvalues(&f->upvalues);
                 free(f);
         }
 }
@@ -237,19 +274,6 @@ static struct l_table *serialize_table(struct callbacks *cb, lua_State *L)
         return t;
 }
 
-struct l_function *serialize_function(struct callbacks *cb, lua_State *L)
-{
-        struct l_function *f;
-
-        f = calloc(1, sizeof(*f));
-        assert(f);
-
-        f->id = (void *) lua_topointer(L, -1);
-        f->code = dump_function_bytecode(cb, L);
-
-        return f;
-}
-
 static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object)
 {
@@ -288,6 +312,10 @@ static void serialize_object(struct callbacks *cb, lua_State *L,
         }
 }
 
+/**
+ * Serializes an upvalue. Expects the upvalue to be at the top of the stack.
+ * Takes the upvalue's number for use during deserialization at a later time.
+ */
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                                     void *id, int number)
 {
@@ -297,6 +325,49 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
         serialize_object(cb, L, &v->value);
 
         return v;
+}
+
+/**
+ * Inserts a given upvale at the begining of a list.
+ */
+void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
+{
+        assert(head);
+        assert(upvalue);
+
+        upvalue->next = *head;
+        *head = upvalue;
+}
+
+static struct l_upvalue *serialize_upvalues(struct callbacks *cb, lua_State *L)
+{
+        struct l_upvalue *list = NULL;
+        struct l_upvalue *v;
+        void *v_id;
+        int i;
+
+        for (i = 1; lua_getupvalue(L, -1, i); i++) {
+                v_id = lua_upvalueid(L, -2, i);
+                v = serialize_upvalue(cb, L, v_id, i);
+                prepend_upvalue(&list, v);
+                lua_pop(L, 1);
+        }
+
+        return list;
+}
+
+struct l_function *serialize_function(struct callbacks *cb, lua_State *L)
+{
+        struct l_function *f;
+
+        f = calloc(1, sizeof(*f));
+        assert(f);
+
+        f->id = (void *) lua_topointer(L, -1);
+        f->code = dump_function_bytecode(cb, L);
+        f->upvalues = serialize_upvalues(cb, L);
+
+        return f;
 }
 
 static void map_object(struct upvalue_cache *cache, void *key,
@@ -389,12 +460,6 @@ static void push_table(struct callbacks *cb, lua_State *L,
         }
 }
 
-int deserialize_function(struct callbacks *cb, lua_State *L,
-                         struct l_function *func, const char *name)
-{
-        return load_function_bytecode(cb, L, func->code, name);
-}
-
 static void push_object(struct callbacks *cb, lua_State *L,
                         struct upvalue_cache *cache,
                         const struct l_object *object)
@@ -442,31 +507,6 @@ static void set_upvalue(struct callbacks *cb, lua_State *L,
         assert(name);
 }
 
-void destroy_upvalues(struct l_upvalue **head)
-{
-        struct l_upvalue *v, *v_next;
-
-        assert(head);
-
-        v = *head;
-        *head = NULL;
-
-        while (v) {
-                v_next = v->next;
-                l_upvalue_free(v);
-                v = v_next;
-        }
-}
-
-void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
-{
-        assert(head);
-        assert(upvalue);
-
-        upvalue->next = *head;
-        *head = upvalue;
-}
-
 struct upvalue_cache *upvalue_cache_new(void)
 {
         return calloc(1, sizeof(struct upvalue_cache));
@@ -509,16 +549,24 @@ static void get_cached_object(lua_State *L, int cache_idx, void *obj_id)
         lua_rawget(L, cache_idx);
 }
 
-void set_shared_upvalue(struct callbacks *cb, lua_State *L,
-                        struct upvalue_cache *upvalue_cache,
-                        int cache_idx, void *func_id,
-                        const struct l_upvalue *upvalue)
+/**
+ * Deserializes an upvalue value and sets it as an upvalue of a function
+ * identified by func_id.
+ *
+ * Records each upvalue deserialized for the first time in the cache table
+ * located at given index on the stack. If an upvalue has been deserialized
+ * before, it will be reused the next time it is encountered via
+ * lua_upvaluejoin().
+ */
+static void set_shared_upvalue(struct callbacks *cb, lua_State *L,
+                               struct upvalue_cache *upvalue_cache,
+                               int cache_idx, void *func_id,
+                               const struct l_upvalue *upvalue)
 {
         const struct upvalue_mapping *m;
 
         upvalue_cache->object_tbl_idx = cache_idx;
 
-        get_cached_object(L, cache_idx, func_id);
         m = lookup_upvalue(upvalue_cache, upvalue->id);
         if (m) {
                 /* An already seen upvalue, we're sharing */
@@ -531,5 +579,26 @@ void set_shared_upvalue(struct callbacks *cb, lua_State *L,
                 map_upvalue(upvalue_cache, upvalue->id,
                             func_id, upvalue->number);
         }
-        lua_pop(L, 1);
+}
+
+int deserialize_function(struct callbacks *cb, lua_State *L,
+                         struct upvalue_cache *cache, int cache_idx,
+                         const struct l_function *func, const char *name)
+{
+        struct l_upvalue *v;
+        void *func_id;
+        int err;
+
+        err = load_function_bytecode(cb, L, func->code, name);
+        if (err)
+                return err;
+        func_id = (void *) lua_topointer(L, -1);
+
+        /* Set upvalues */
+        for (v = func->upvalues; v; v = v->next)
+                set_shared_upvalue(cb, L, cache, cache_idx, func_id, v);
+
+        /* TODO: Push globals */
+
+        return 0;
 }
