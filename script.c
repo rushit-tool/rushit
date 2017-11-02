@@ -63,25 +63,6 @@ static struct script_hook *script_engine_put_hook(struct script_hook *hook)
 }
 DEFINE_CLEANUP_FUNC(script_engine_put_hook, struct script_hook *);
 
-static void hook_set_bytecode(struct script_hook *h, struct byte_array *bytecode)
-{
-        assert(h);
-
-        byte_array_free(h->bytecode);
-        h->bytecode = bytecode;
-}
-
-static int store_hook_bytecode(struct callbacks *cb, lua_State *L,
-                               struct script_hook *hook)
-{
-        struct byte_array *code;
-
-        code = dump_function_bytecode(cb, L);
-        hook_set_bytecode(hook, code);
-
-        return 0;
-}
-
 static struct script_engine *get_context(lua_State *L)
 {
         struct script_engine *se;
@@ -95,32 +76,11 @@ static struct script_engine *get_context(lua_State *L)
         return se;
 }
 
-static void store_hook_upvalues(struct callbacks *cb, struct lua_State *L,
-                                struct script_hook *hook)
-{
-        struct l_upvalue *upval;
-        int i, top;
-        void *id;
-
-        assert(hook);
-
-        destroy_upvalues(&hook->upvalues);
-
-        top = lua_gettop(L);
-        for (i = 1; lua_getupvalue(L, top, i); i++) {
-                id = lua_upvalueid(L, top, i);
-                upval = serialize_upvalue(cb, L, id, i);
-                prepend_upvalue(&hook->upvalues, upval);
-                lua_pop(L, 1);
-        }
-}
-
 static int store_hook(lua_State *L, enum run_mode run_mode,
                       enum script_hook_id hid)
 {
         CLEANUP(script_engine_put_hook) struct script_hook *h = NULL;
         struct script_engine *se;
-        int rc = 0;
 
         /* Expect a function argument */
         luaL_checktype(L, 1, LUA_TFUNCTION);
@@ -128,11 +88,12 @@ static int store_hook(lua_State *L, enum run_mode run_mode,
         se = get_context(L);
         if (se->run_mode == run_mode) {
                 h = script_engine_get_hook(se, hid);
-                store_hook_upvalues(se->cb, L, h);
-                rc = store_hook_bytecode(se->cb, L, h);
+                if (h->function)
+                        LOG_FATAL(se->cb, "hook %s already set", h->name);
+                h->function = serialize_function(se->cb, L);
         }
 
-        return rc;
+        return 0;
 }
 
 static int client_socket_cb(lua_State *L)
@@ -316,10 +277,8 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         lua_close(se->L);
         se->L = NULL;
 
-        for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++) {
-                byte_array_free(h->bytecode);
-                destroy_upvalues(&h->upvalues);
-        }
+        for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++)
+                l_function_free(h->function);
 
         free(se);
         return NULL;
@@ -419,6 +378,10 @@ int script_slave_create(struct script_slave **ssp, struct script_engine *se)
 
         /* TODO: Install hooks */
 
+        ss->hook_upvalues = upvalue_cache_new();
+        if (!ss->hook_upvalues)
+                return -ENOMEM;
+
         ss->se = se;
         ss->cb = se->cb;
         ss->L = L;
@@ -441,7 +404,7 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
         ss->L = NULL;
         ss->se = NULL;
 
-        destroy_upvalues(&ss->hook_upvalues);
+        upvalue_cache_free(ss->hook_upvalues);
 
         free(ss);
         return NULL;
@@ -498,51 +461,14 @@ static int push_cpointer(struct callbacks *cb, lua_State *L, const char *proto, 
 /* Load a serialized hook function. Return a key to it in the registry. */
 static int load_hook(struct callbacks *cb, lua_State *L,
                      const struct script_hook *hook,
-                     struct l_upvalue **upvalues,
+                     struct upvalue_cache *upvalues,
                      void **key)
 {
-        struct l_upvalue *v1, *v2;
-        void *hook_key;
-        int hook_idx;
-        int err;
-
-        if (!hook->bytecode)
+        if (!hook->function)
                 return -EHOOKEMPTY;
 
-        err = load_function_bytecode(cb, L, hook->bytecode, hook->name);
-        if (err)
-                return err;
-        hook_idx = lua_gettop(L);
-        hook_key = (void *) lua_topointer(L, -1);
-
-        /* Set upvalues */
-        for (v1 = hook->upvalues; v1; v1 = v1->next) {
-                v2 = find_upvalue_by_id(upvalues, v1->id);
-                if (v2) {
-                        /* An already seen upvalue, we're sharing */
-                        lua_pushlightuserdata(L, v2->value.func_id);
-                        lua_rawget(L, LUA_REGISTRYINDEX);
-
-                        lua_upvaluejoin(L, hook_idx, v1->number,
-                                        -1, v2->number);
-
-                        lua_pop(L, 1);
-                } else {
-                        /* Upvalue seen for the first time */
-                        set_upvalue(cb, L, hook_idx, v1);
-                        record_upvalueref(upvalues, v1, hook_key);
-                }
-        }
-
-        /* TODO: Push globals */
-
-        /* Keep a reference to the hook */
-        lua_pushlightuserdata(L, hook_key);
-        lua_insert(L, -2);
-        lua_rawset(L, LUA_REGISTRYINDEX);
-
-        *key = hook_key;
-        return 0;
+        return deserialize_function(cb, L, upvalues, LUA_REGISTRYINDEX,
+                                    hook->function, hook->name, key);
 }
 
 static int push_hook(struct script_slave *ss, enum script_hook_id hid)
@@ -557,7 +483,7 @@ static int push_hook(struct script_slave *ss, enum script_hook_id hid)
         L = ss->L;
 
         if (!ss->hook_keys[hid]) {
-                err = load_hook(ss->cb, L, h, &ss->hook_upvalues,
+                err = load_hook(ss->cb, L, h, ss->hook_upvalues,
                                 &ss->hook_keys[hid]);
                 if (err)
                         return err;

@@ -394,48 +394,70 @@ static void t_pass_args_to_packet_hook(void **state)
         assert_int_equal(r, 0);
 }
 
-static void t_run_hook_with_one_primitive_upvalue(void **state)
+static void t_run_hook_with_boolean_upvalue(void **state)
 {
-        const char *script[] = {
-                /* boolean */
+        const char *script =
                 "local flag = true;"
                 "client_socket("
                 "  function ()"
                 "    " lua_assert_true(flag)
                 "    return 0;"
                 "  end"
-                ")",
-                /* number */
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_run_hook_with_number_upvalue(void **state)
+{
+        const char *script =
                 "local number = 42;"
                 "client_socket("
                 "  function ()"
                 "    " lua_assert_equal(number, 42)
                 "    return 0;"
                 "  end"
-                ")",
-                /* string */
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_run_hook_with_string_upvalue(void **state)
+{
+        const char *script =
                 "local string = 'foo';"
                 "client_socket("
                 "  function ()"
                 "    " lua_assert_equal(string, 'foo')
                 "    return 0;"
                 "  end"
-                ")",
-        };
+                ");";
         struct script_slave *ss = *state;
         struct script_engine *se = ss->se;
-        int i, r;
+        int r;
 
-        for (i = 0; i < ARRAY_SIZE(script); i++) {
-                r = script_engine_run_string(se, script[i], NULL, NULL);
-                assert_return_code(r, -r);
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
 
-                r = script_slave_socket_hook(ss, -1, NULL);
-                assert_return_code(r, -r);
-        }
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
 }
 
-static void t_run_hook_with_multiple_upvalues(void **state)
+static void t_run_hook_with_multiple_primitive_upvalues(void **state)
 {
         const char *script =
                 "local flag = true;"
@@ -602,6 +624,157 @@ static void t_hooks_share_table_upvalues(void **state)
         assert_return_code(r, -r);
 }
 
+static void t_hook_can_access_table_referencing_table(void **state)
+{
+        const char *script =
+                "local t1 = { 42 };"
+                "local t2 = { t1 };"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(t2[1][1], 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+
+}
+
+static void t_hook_can_access_table_referencing_function(void **state)
+{
+        const char *script =
+                "local function f() return 42 end;"
+                "local t = { f };"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(t[1](), 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_tables_that_are_not_upvalues_are_shared(void **state)
+{
+        /* t1 is an upvalue for client_close hook.
+         * t2 is an upvalue for client_socket hook.
+         * t2 references t1, so both hooks should see the same value. */
+        const char *script =
+                "local t1 = { 0 };"
+                "local t2 = { t1 };"
+                "client_socket("
+                "  function ()"
+                "    t2[1][1] = 42;"
+                "    return 0;"
+                "  end"
+                ");"
+                "client_close("
+                "  function ()"
+                "    " lua_assert_equal(t1[1], 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_close_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_hook_can_access_function_with_basic_upvalues(void **state)
+{
+        const char *script =
+                "local b = true;"
+                "local n = 42;"
+                "local s = 'fizz';"
+                "local function f1() return b end;"
+                "local function f2() return n end;"
+                "local function f3() return s end;"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_true(f1())
+                "    " lua_assert_equal(f2(), 42)
+                "    " lua_assert_equal(f3(), 'fizz')
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_hook_can_access_function_with_table_upvalue(void **state)
+{
+        const char *script =
+                "local t = { 42 };"
+                "local function f() return t[1] end;"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(f(), 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_hook_can_access_function_with_function_upvalue(void **state)
+{
+        const char *script =
+                "local function f() return 42 end;"
+                "local function g() return f() end;"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(g(), 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
 #define clinet_engine_unit_test(f) \
         cmocka_unit_test_setup_teardown((f), client_engine_setup, client_engine_teardown)
 #define client_slave_unit_test(f) \
@@ -623,13 +796,21 @@ int main(void)
                 client_slave_unit_test(t_run_recverr_hook),
                 client_slave_unit_test(t_pass_args_to_socket_hook),
                 client_slave_unit_test(t_pass_args_to_packet_hook),
-                client_slave_unit_test(t_run_hook_with_one_primitive_upvalue),
-                client_slave_unit_test(t_run_hook_with_multiple_upvalues),
+                client_slave_unit_test(t_run_hook_with_boolean_upvalue),
+                client_slave_unit_test(t_run_hook_with_number_upvalue),
+                client_slave_unit_test(t_run_hook_with_string_upvalue),
+                client_slave_unit_test(t_run_hook_with_multiple_primitive_upvalues),
                 client_slave_unit_test(t_run_hook_with_function_upvalue),
                 client_slave_unit_test(t_run_hook_with_table_of_primitive_values_upvalue),
                 client_slave_unit_test(t_upvalues_dont_get_reset),
                 client_slave_unit_test(t_hooks_share_basic_upvalues),
                 client_slave_unit_test(t_hooks_share_table_upvalues),
+                client_slave_unit_test(t_hook_can_access_table_referencing_table),
+                client_slave_unit_test(t_hook_can_access_table_referencing_function),
+                client_slave_unit_test(t_tables_that_are_not_upvalues_are_shared),
+                client_slave_unit_test(t_hook_can_access_function_with_basic_upvalues),
+                client_slave_unit_test(t_hook_can_access_function_with_table_upvalue),
+                client_slave_unit_test(t_hook_can_access_function_with_function_upvalue),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);

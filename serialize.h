@@ -30,85 +30,29 @@
 
 struct callbacks;
 
-struct l_object {
-        int type;
-        union {
-                bool boolean;
-                lua_Number number;
-                char *string;
-                struct byte_array *function;
-                struct l_table_entry *table;
-                void *func_id;
-        };
-};
+struct l_function;
+struct upvalue_cache;
 
-struct l_table_entry {
-        struct l_table_entry *next;
-        struct l_object key;
-        struct l_object value;
-};
 
-struct l_upvalue {
-        struct l_upvalue *next;
-        void *id;
-        int number;
-        struct l_object value;
-};
+struct upvalue_cache * upvalue_cache_new(void);
+void upvalue_cache_free(struct upvalue_cache *c);
 
+void l_function_free(struct l_function *f);
 
 /**
- * Serializes the Lua function at the top of the stack. Just the function code
- * without its upvalues.
+ * Serializes the Lua function at the top of the stack.
  */
-struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L);
+struct l_function *serialize_function(struct callbacks *cb, lua_State *L);
 
 /**
- * Deserializes the function and leaves it on top the stack. Function upvalues
- * have to be set separately.
+ * Deserializes the function and leaves it on top the stack.
+ *
+ * Caches the deserialized objects so that they can be shared with other
+ * deserialized functions.
  */
-int load_function_bytecode(struct callbacks *cb, lua_State *L,
-                           const struct byte_array *bytecode, const char *name);
-
-/**
- * Serializes an upvalue. Expects the upvalue to be at the top of the stack.
- * Takes the upvalue's number for use during deserialization at a later time.
- */
-struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
-                                    void *id, int number);
-
-/**
- * Frees the memory allocated for a serialized upvalue.
- */
-void l_upvalue_free(struct l_upvalue *v);
-
-/**
- * Deserializes and sets an upvalue of a function. Expected the function to be
- * at func_index on the stack.
- */
-void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                 struct l_upvalue *upvalue);
-
-/**
- * Free upvalues on a list. List head pointer gets set to NULL.
- */
-void destroy_upvalues(struct l_upvalue **head);
-
-/**
- * Prepend a new upvalue to a list
- */
-void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue);
-
-/**
- * Find the upvalue with the give id
- */
-struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id);
-
-/**
- * Record where an upvalue was set, i.e. in what function, by adding an upvalue
- * reference (a special upvalue that stores function id) to the list of
- * references.
- */
-void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
-                       void *func_id);
+int deserialize_function(struct callbacks *cb, lua_State *L,
+                         struct upvalue_cache *cache, int cache_idx,
+                         const struct l_function *func, const char *name,
+                         void **object_key);
 
 #endif

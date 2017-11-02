@@ -25,31 +25,100 @@
 #include "logging.h"
 #include "script.h"
 
+struct l_object {
+        int type;
+        union {
+                bool boolean;
+                lua_Number number;
+                char *string;
+                struct l_function *function;
+                struct l_table *table;
+        };
+};
 
-enum {
-        XLUA_TUPVALUEREF = -1,
+struct l_upvalue {
+        struct l_upvalue *next;
+        void *id;
+        int number;
+        struct l_object value;
+};
+
+struct l_table_entry {
+        struct l_table_entry *next;
+        struct l_object key;
+        struct l_object value;
+};
+
+struct l_table {
+        void *id;
+        struct l_table_entry *entries;
+};
+
+struct l_function {
+        void *id;
+        struct byte_array *code;
+        struct l_upvalue *upvalues;
+};
+
+struct upvalue_mapping {
+        struct upvalue_mapping *next;
+        void *key;
+        void *function_id;
+        int upvalue_num;
+};
+
+struct object_mapping {
+        struct object_mapping *next;
+        void *key;
+        void *object_id;
+};
+
+struct upvalue_cache {
+        /* Map of serialized upvalue ids to deserialized (function id, upvalue
+         * number) tuples */
+        struct upvalue_mapping *upvalue_map;
+        /* Map of serialized object ids to deserialized object ids */
+        struct object_mapping *object_map;
+        /* Lua store for deserialized objects indexed by their id */
+        int object_tbl_idx;
 };
 
 
 static void l_object_free_data(struct l_object *o);
-static void serialize_object(struct callbacks *cb, lua_State *L, int index,
+static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object);
+static int push_function(struct callbacks *cb, lua_State *L,
+                         struct upvalue_cache *cache,
+                         const struct l_function *func, const char *name,
+                         void **object_key);
 static void push_object(struct callbacks *cb, lua_State *L,
-                        struct l_object *object);
+                        struct upvalue_cache *cache,
+                        const struct l_object *object);
 
 
-static void table_free(struct l_table_entry *table)
+static void table_entry_free(struct l_table_entry *e)
 {
-        struct l_table_entry *next;
+        l_object_free_data(&e->key);
+        l_object_free_data(&e->value);
+        free(e);
+}
 
-        while (table) {
-                next = table->next;
+static void table_free_entries(struct l_table_entry *e)
+{
+        struct l_table_entry *e_next;
 
-                l_object_free_data(&table->key);
-                l_object_free_data(&table->value);
-                free(table);
+        while (e) {
+                e_next = e->next;
+                table_entry_free(e);
+                e = e_next;
+        }
+}
 
-                table = next;
+static void table_free(struct l_table *t)
+{
+        if (t) {
+                table_free_entries(t->entries);
+                free(t);
         }
 }
 
@@ -61,14 +130,13 @@ static void l_object_free_data(struct l_object *o)
         switch (o->type) {
         case LUA_TBOOLEAN:
         case LUA_TNUMBER:
-        case XLUA_TUPVALUEREF:
                 /* nothing to do */
                 break;
         case LUA_TSTRING:
                 free(o->string);
                 break;
         case LUA_TFUNCTION:
-                byte_array_free(o->function);
+                l_function_free(o->function);
                 break;
         case LUA_TTABLE:
                 table_free(o->table);
@@ -91,13 +159,41 @@ static struct l_upvalue *l_upvalue_new(void *id, int number)
         return v;
 }
 
-void l_upvalue_free(struct l_upvalue *v)
+static void l_upvalue_free(struct l_upvalue *v)
 {
         if (!v)
                 return;
 
         l_object_free_data(&v->value);
         free(v);
+}
+
+/**
+ * Frees a list of upvalues. List head pointer gets reset to NULL.
+ */
+void destroy_upvalues(struct l_upvalue **head)
+{
+        struct l_upvalue *v, *v_next;
+
+        assert(head);
+
+        v = *head;
+        *head = NULL;
+
+        while (v) {
+                v_next = v->next;
+                l_upvalue_free(v);
+                v = v_next;
+        }
+}
+
+void l_function_free(struct l_function *f)
+{
+        if (f) {
+                byte_array_free(f->code);
+                destroy_upvalues(&f->upvalues);
+                free(f);
+        }
 }
 
 static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
@@ -107,7 +203,8 @@ static int string_writer(lua_State *L, const void *str, size_t len, void *buf)
         return 0;
 }
 
-struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L)
+static struct byte_array *dump_function_bytecode(struct callbacks *cb,
+                                                 lua_State *L)
 {
         struct byte_array *code;
         const char *buf;
@@ -130,9 +227,9 @@ struct byte_array *dump_function_bytecode(struct callbacks *cb, lua_State *L)
         return code;
 }
 
-int load_function_bytecode(struct callbacks *cb, lua_State *L,
-                           const struct byte_array *bytecode,
-                           const char *name)
+static int load_function_bytecode(struct callbacks *cb, lua_State *L,
+                                  const struct byte_array *bytecode,
+                                  const char *name)
 {
         int err;
 
@@ -147,52 +244,63 @@ int load_function_bytecode(struct callbacks *cb, lua_State *L,
 }
 
 static struct l_table_entry *dump_table_entries(struct callbacks *cb,
-                                                lua_State *L, int index)
+                                                lua_State *L)
 {
         struct l_table_entry *head = NULL;
-        int tbl_idx;
 
-        tbl_idx = lua_gettop(L);
         lua_pushnil(L);
-        while (lua_next(L, tbl_idx)) {
+        while (lua_next(L, -2)) {
                 struct l_table_entry *e = calloc(1, sizeof(*e));
                 if (!e)
                         LOG_FATAL(cb, "calloc failed");
                 e->next = head;
                 head = e;
 
-                serialize_object(cb, L, -2, &e->key);
-                serialize_object(cb, L, -1, &e->value);
+                serialize_object(cb, L, &e->value);
                 lua_pop(L, 1);
+                serialize_object(cb, L, &e->key);
+                /* leave key on stack */
         }
 
         return head;
 }
 
-static void serialize_object(struct callbacks *cb, lua_State *L, int index,
+static struct l_table *serialize_table(struct callbacks *cb, lua_State *L)
+{
+        struct l_table *t;
+
+        t = calloc(1, sizeof(*t));
+        assert(t);
+
+        t->id = (void *) lua_topointer(L, -1);
+        t->entries = dump_table_entries(cb, L);
+
+        return t;
+}
+
+static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object)
 {
-        object->type = lua_type(L, index);
+        object->type = lua_type(L, -1);
 
         switch (object->type) {
         case LUA_TNIL:
                 assert(false);
                 break;
         case LUA_TNUMBER:
-                object->number = lua_tonumber(L, index);
+                object->number = lua_tonumber(L, -1);
                 break;
         case LUA_TBOOLEAN:
-                object->boolean = lua_toboolean(L, index);
+                object->boolean = lua_toboolean(L, -1);
                 break;
         case LUA_TSTRING:
-                object->string = strdup(lua_tostring(L, index));
+                object->string = strdup(lua_tostring(L, -1));
                 break;
         case LUA_TTABLE:
-                object->table = dump_table_entries(cb, L, index);
+                object->table = serialize_table(cb, L);
                 break;
         case LUA_TFUNCTION:
-                assert(index == -1); /* Not supported */
-                object->function = dump_function_bytecode(cb, L);
+                object->function = serialize_function(cb, L);
                 break;
         case LUA_TUSERDATA:
                 assert(false); /* XXX: Not implemented */
@@ -208,32 +316,171 @@ static void serialize_object(struct callbacks *cb, lua_State *L, int index,
         }
 }
 
+/**
+ * Serializes an upvalue. Expects the upvalue to be at the top of the stack.
+ * Takes the upvalue's number for use during deserialization at a later time.
+ */
 struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                                     void *id, int number)
 {
         struct l_upvalue *v;
 
         v = l_upvalue_new(id, number);
-        serialize_object(cb, L, -1, &v->value);
+        serialize_object(cb, L, &v->value);
 
         return v;
 }
 
+/**
+ * Inserts a given upvale at the begining of a list.
+ */
+void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
+{
+        assert(head);
+        assert(upvalue);
+
+        upvalue->next = *head;
+        *head = upvalue;
+}
+
+static struct l_upvalue *serialize_upvalues(struct callbacks *cb, lua_State *L)
+{
+        struct l_upvalue *list = NULL;
+        struct l_upvalue *v;
+        void *v_id;
+        int i;
+
+        for (i = 1; lua_getupvalue(L, -1, i); i++) {
+                v_id = lua_upvalueid(L, -2, i);
+                v = serialize_upvalue(cb, L, v_id, i);
+                prepend_upvalue(&list, v);
+                lua_pop(L, 1);
+        }
+
+        return list;
+}
+
+struct l_function *serialize_function(struct callbacks *cb, lua_State *L)
+{
+        struct l_function *f;
+
+        f = calloc(1, sizeof(*f));
+        assert(f);
+
+        f->id = (void *) lua_topointer(L, -1);
+        f->code = dump_function_bytecode(cb, L);
+        f->upvalues = serialize_upvalues(cb, L);
+
+        return f;
+}
+
+static void map_object(struct upvalue_cache *cache, void *key,
+                       void *object_id)
+{
+        struct object_mapping *m;
+
+        m = calloc(1, sizeof(*m));
+        assert(m);
+        m->key = key;
+        m->object_id = object_id;
+
+        m->next = cache->object_map;
+        cache->object_map = m;
+}
+
+static const struct object_mapping *lookup_object(struct upvalue_cache *cache,
+                                                  void *key)
+{
+        struct object_mapping *m;
+
+        for (m = cache->object_map; m; m = m->next) {
+                if (m->key == key)
+                        return m;
+        }
+        return NULL;
+}
+
+static void *cache_object(struct upvalue_cache *cache, lua_State *L)
+{
+        void *id;
+
+        id = (void *) lua_topointer(L, -1);
+        lua_pushlightuserdata(L, id);
+        lua_pushvalue(L, -2);
+        lua_rawset(L, cache->object_tbl_idx);
+
+        return id;
+}
+
+static void fetch_object(struct upvalue_cache *cache, lua_State *L, void *id)
+{
+        lua_pushlightuserdata(L, id);
+        lua_rawget(L, cache->object_tbl_idx);
+}
+
+static bool lookup_and_fetch_object(struct upvalue_cache *cache, lua_State *L,
+                                    void *key)
+{
+        const struct object_mapping *m;
+
+        m = lookup_object(cache, key);
+        if (m) {
+                lua_pushlightuserdata(L, m->object_id);
+                lua_rawget(L, cache->object_tbl_idx);
+                return true;
+        }
+        return false;
+}
+
+static void map_upvalue(struct upvalue_cache *cache, void *key,
+                        void *function_id, int upvalue_num)
+{
+        struct upvalue_mapping *m;
+
+        m = calloc(1, sizeof(*m));
+        assert(m);
+        m->key = key;
+        m->function_id = function_id;
+        m->upvalue_num = upvalue_num;
+
+        m->next = cache->upvalue_map;
+        cache->upvalue_map = m;
+}
+
+static const struct upvalue_mapping *lookup_upvalue(struct upvalue_cache *cache,
+                                                    void *key)
+{
+        struct upvalue_mapping *m;
+
+        for (m = cache->upvalue_map; m; m = m->next) {
+                if (m->key == key)
+                        return m;
+        }
+        return NULL;
+}
+
 static void push_table(struct callbacks *cb, lua_State *L,
-                       struct l_table_entry *table)
+                       struct upvalue_cache *cache,
+                       struct l_table *table)
 {
         struct l_table_entry *e;
+        void *id;
 
         lua_newtable(L);
-        for (e = table; e; e = e->next) {
-                push_object(cb, L, &e->key);
-                push_object(cb, L, &e->value);
+
+        id = cache_object(cache, L);
+        map_object(cache, table->id, id);
+
+        for (e = table->entries; e; e = e->next) {
+                push_object(cb, L, cache, &e->key);
+                push_object(cb, L, cache, &e->value);
                 lua_rawset(L, -3);
         }
 }
 
 static void push_object(struct callbacks *cb, lua_State *L,
-                        struct l_object *object)
+                        struct upvalue_cache *cache,
+                        const struct l_object *object)
 {
         switch (object->type) {
         case LUA_TBOOLEAN:
@@ -246,10 +493,12 @@ static void push_object(struct callbacks *cb, lua_State *L,
                 lua_pushstring(L, object->string);
                 break;
         case LUA_TFUNCTION:
-                load_function_bytecode(cb, L, object->function, NULL);
+                if (!lookup_and_fetch_object(cache, L, object->function->id))
+                    push_function(cb, L, cache, object->function, NULL, NULL);
                 break;
         case LUA_TTABLE:
-                push_table(cb, L, object->table);
+                if (!lookup_and_fetch_object(cache, L, object->table->id))
+                    push_table(cb, L, cache, object->table);
                 break;
         default:
                 assert(false);
@@ -257,80 +506,123 @@ static void push_object(struct callbacks *cb, lua_State *L,
         }
 }
 
-void set_upvalue(struct callbacks *cb, lua_State *L, int func_index,
-                 struct l_upvalue *upvalue)
+static void set_upvalue(struct callbacks *cb, lua_State *L,
+                        struct upvalue_cache *cache,
+                        const struct l_upvalue *upvalue)
 {
         const char *name;
 
-        push_object(cb, L, &upvalue->value);
-        name = lua_setupvalue(L, func_index, upvalue->number);
+        push_object(cb, L, cache, &upvalue->value);
+        name = lua_setupvalue(L, -2, upvalue->number);
         assert(name);
 }
 
-void destroy_upvalues(struct l_upvalue **head)
+struct upvalue_cache *upvalue_cache_new(void)
 {
-        struct l_upvalue *v, *v_next;
+        return calloc(1, sizeof(struct upvalue_cache));
+}
 
-        assert(head);
+static void destroy_object_map(struct object_mapping *m)
+{
+        struct object_mapping *m_next;
 
-        v = *head;
-        *head = NULL;
-
-        while (v) {
-                v_next = v->next;
-                l_upvalue_free(v);
-                v = v_next;
+        while (m) {
+                m_next = m->next;
+                free(m);
+                m = m_next;
         }
 }
 
-void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
+static void destroy_upvalue_map(struct upvalue_mapping *m)
 {
-        assert(head);
-        assert(upvalue);
+        struct upvalue_mapping *m_next;
 
-        upvalue->next = *head;
-        *head = upvalue;
-}
-
-struct l_upvalue *find_upvalue_by_id(struct l_upvalue **head, void *id)
-{
-        struct l_upvalue *v;
-
-        assert(head);
-
-        for (v = *head; v; v = v->next) {
-                if (v->id == id)
-                        return v;
+        while (m) {
+                m_next = m->next;
+                free(m);
+                m = m_next;
         }
-
-        return NULL;
 }
 
-static void init_upvalueref(struct l_object *obj, void *func_id)
+void upvalue_cache_free(struct upvalue_cache *c)
 {
-        obj->type = XLUA_TUPVALUEREF;
-        obj->func_id = func_id;
+        if (c) {
+                destroy_object_map(c->object_map);
+                destroy_upvalue_map(c->upvalue_map);
+                free(c);
+        }
 }
 
-static struct l_upvalue *create_upvalueref(const struct l_upvalue *upvalue,
-                                           void *func_id)
+/**
+ * Deserializes an upvalue value and sets it as an upvalue of a function
+ * identified by func_id.
+ *
+ * Records each upvalue deserialized for the first time in the cache table
+ * located at given index on the stack. If an upvalue has been deserialized
+ * before, it will be reused the next time it is encountered via
+ * lua_upvaluejoin().
+ */
+static void set_shared_upvalue(struct callbacks *cb, lua_State *L,
+                               struct upvalue_cache *upvalue_cache,
+                               void *func_id, const struct l_upvalue *upvalue)
+{
+        const struct upvalue_mapping *m;
+
+        m = lookup_upvalue(upvalue_cache, upvalue->id);
+        if (m) {
+                /* An already seen upvalue, we're sharing */
+                fetch_object(upvalue_cache, L, m->function_id);
+                lua_upvaluejoin(L, -2, upvalue->number, -1, m->upvalue_num);
+                lua_pop(L, 1);
+        } else {
+                /* Upvalue seen for the first time */
+                set_upvalue(cb, L, upvalue_cache, upvalue);
+                map_upvalue(upvalue_cache, upvalue->id,
+                            func_id, upvalue->number);
+        }
+}
+
+static int push_function(struct callbacks *cb, lua_State *L,
+                         struct upvalue_cache *cache,
+                         const struct l_function *func, const char *name,
+                         void **object_key)
 {
         struct l_upvalue *v;
+        void *func_id;
+        int err;
 
-        v = l_upvalue_new(upvalue->id, upvalue->number);
-        init_upvalueref(&v->value, func_id);
+        assert(cache);
+        assert(func);
 
-        return v;
+        err = load_function_bytecode(cb, L, func->code, name);
+        if (err)
+                return err;
 
+        func_id = cache_object(cache, L);
+        map_object(cache, func->id, func_id);
+
+        /* Set upvalues */
+        for (v = func->upvalues; v; v = v->next)
+                set_shared_upvalue(cb, L, cache, func_id, v);
+
+        /* TODO: Push globals */
+
+        if (object_key)
+                *object_key = func_id;
+
+        return 0;
 }
 
-void record_upvalueref(struct l_upvalue **head, const struct l_upvalue *upvalue,
-                       void *func_id)
+int deserialize_function(struct callbacks *cb, lua_State *L,
+                         struct upvalue_cache *cache, int cache_idx,
+                         const struct l_function *func, const char *name,
+                         void **object_key)
 {
-        struct l_upvalue *v;
+        assert(cache);
+        assert(func);
+        assert(object_key);
 
-        assert(head);
+        cache->object_tbl_idx = cache_idx;
 
-        v = create_upvalueref(upvalue, func_id);
-        prepend_upvalue(head, v);
+        return push_function(cb, L, cache, func, name, object_key);
 }

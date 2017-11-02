@@ -56,8 +56,7 @@ enum script_hook_id {
 
 struct script_hook {
         const char *name;
-        struct byte_array *bytecode;
-        struct l_upvalue *upvalues;
+        struct l_function *function;
 };
 
 struct script_engine {
@@ -74,7 +73,7 @@ struct script_slave {
         struct lua_State *L;
         struct callbacks *cb;
         void *hook_keys[SCRIPT_HOOK_MAX];
-        struct l_upvalue *hook_upvalues;
+        struct upvalue_cache *hook_upvalues;
 };
 
 int script_engine_create(struct script_engine **sep, struct callbacks *cb,
