@@ -84,7 +84,7 @@ struct upvalue_cache {
 };
 
 
-static void l_object_free_data(struct l_object *o);
+static void free_object_data(struct l_object *o);
 static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object);
 static int push_function(struct callbacks *cb, lua_State *L,
@@ -98,8 +98,8 @@ static void push_object(struct callbacks *cb, lua_State *L,
 
 static void free_table_entry(struct l_table_entry *e)
 {
-        l_object_free_data(&e->key);
-        l_object_free_data(&e->value);
+        free_object_data(&e->key);
+        free_object_data(&e->value);
         free(e);
 }
 
@@ -119,7 +119,7 @@ static void free_table(struct l_table *t)
         }
 }
 
-static void l_object_free_data(struct l_object *o)
+static void free_object_data(struct l_object *o)
 {
         if (!o)
                 return;
@@ -161,7 +161,7 @@ static void l_upvalue_free(struct l_upvalue *v)
         if (!v)
                 return;
 
-        l_object_free_data(&v->value);
+        free_object_data(&v->value);
         free(v);
 }
 
