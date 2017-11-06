@@ -36,8 +36,8 @@ struct l_object {
         };
 };
 
-struct l_upvalue {
-        struct l_upvalue *next;
+struct supvalue {
+        struct supvalue *next;
         void *id;
         int number;
         struct l_object value;
@@ -57,7 +57,7 @@ struct stable {
 struct sfunction {
         void *id;
         struct byte_array *code;
-        struct l_upvalue *upvalues;
+        struct supvalue *upvalues;
 };
 
 struct upvalue_mapping {
@@ -143,9 +143,9 @@ static void free_object_data(struct l_object *o)
         }
 }
 
-static struct l_upvalue *l_upvalue_new(void *id, int number)
+static struct supvalue *l_upvalue_new(void *id, int number)
 {
-        struct l_upvalue *v;
+        struct supvalue *v;
 
         v = calloc(1, sizeof(*v));
         assert(v);
@@ -156,7 +156,7 @@ static struct l_upvalue *l_upvalue_new(void *id, int number)
         return v;
 }
 
-static void free_upvalue(struct l_upvalue *v)
+static void free_upvalue(struct supvalue *v)
 {
         if (!v)
                 return;
@@ -168,9 +168,9 @@ static void free_upvalue(struct l_upvalue *v)
 /**
  * Frees a list of upvalues. List head pointer gets reset to NULL.
  */
-static void free_upvalues(struct l_upvalue **head)
+static void free_upvalues(struct supvalue **head)
 {
-        struct l_upvalue *v;
+        struct supvalue *v;
 
         assert(head);
 
@@ -312,10 +312,10 @@ static void serialize_object(struct callbacks *cb, lua_State *L,
  * Serializes an upvalue. Expects the upvalue to be at the top of the stack.
  * Takes the upvalue's number for use during deserialization at a later time.
  */
-struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
+struct supvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
                                     void *id, int number)
 {
-        struct l_upvalue *v;
+        struct supvalue *v;
 
         v = l_upvalue_new(id, number);
         serialize_object(cb, L, &v->value);
@@ -326,7 +326,7 @@ struct l_upvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
 /**
  * Inserts a given upvale at the begining of a list.
  */
-void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
+void prepend_upvalue(struct supvalue **head, struct supvalue *upvalue)
 {
         assert(head);
         assert(upvalue);
@@ -335,10 +335,10 @@ void prepend_upvalue(struct l_upvalue **head, struct l_upvalue *upvalue)
         *head = upvalue;
 }
 
-static struct l_upvalue *serialize_upvalues(struct callbacks *cb, lua_State *L)
+static struct supvalue *serialize_upvalues(struct callbacks *cb, lua_State *L)
 {
-        struct l_upvalue *list = NULL;
-        struct l_upvalue *v;
+        struct supvalue *list = NULL;
+        struct supvalue *v;
         void *v_id;
         int i;
 
@@ -500,7 +500,7 @@ static void push_object(struct callbacks *cb, lua_State *L,
 
 static void set_upvalue(struct callbacks *cb, lua_State *L,
                         struct upvalue_cache *cache,
-                        const struct l_upvalue *upvalue)
+                        const struct supvalue *upvalue)
 {
         const char *name;
 
@@ -550,7 +550,7 @@ void free_upvalue_cache(struct upvalue_cache *c)
  */
 static void set_shared_upvalue(struct callbacks *cb, lua_State *L,
                                struct upvalue_cache *upvalue_cache,
-                               void *func_id, const struct l_upvalue *upvalue)
+                               void *func_id, const struct supvalue *upvalue)
 {
         const struct upvalue_mapping *m;
 
@@ -573,7 +573,7 @@ static int push_function(struct callbacks *cb, lua_State *L,
                          const struct sfunction *func, const char *name,
                          void **object_key)
 {
-        struct l_upvalue *v;
+        struct supvalue *v;
         void *func_id;
         int err;
 
