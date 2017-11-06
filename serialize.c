@@ -168,7 +168,7 @@ static void free_upvalue(struct l_upvalue *v)
 /**
  * Frees a list of upvalues. List head pointer gets reset to NULL.
  */
-void destroy_upvalues(struct l_upvalue **head)
+static void destroy_upvalues(struct l_upvalue **head)
 {
         struct l_upvalue *v;
 
