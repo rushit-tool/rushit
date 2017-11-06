@@ -522,7 +522,7 @@ static void free_object_mappings(struct object_mapping *mappings)
                 free(m);
 }
 
-static void destroy_upvalue_map(struct upvalue_mapping *mappings)
+static void free_upvalue_mappings(struct upvalue_mapping *mappings)
 {
         struct upvalue_mapping *m;
 
@@ -534,7 +534,7 @@ void upvalue_cache_free(struct upvalue_cache *c)
 {
         if (c) {
                 free_object_mappings(c->object_map);
-                destroy_upvalue_map(c->upvalue_map);
+                free_upvalue_mappings(c->upvalue_map);
                 free(c);
         }
 }
