@@ -25,7 +25,7 @@
 #include "logging.h"
 #include "script.h"
 
-struct l_object {
+struct svalue {
         int type;
         union {
                 bool boolean;
@@ -40,13 +40,13 @@ struct supvalue {
         struct supvalue *next;
         void *id;
         int number;
-        struct l_object value;
+        struct svalue value;
 };
 
 struct stable_entry {
         struct stable_entry *next;
-        struct l_object key;
-        struct l_object value;
+        struct svalue key;
+        struct svalue value;
 };
 
 struct stable {
@@ -84,22 +84,22 @@ struct upvalue_cache {
 };
 
 
-static void free_object_data(struct l_object *o);
+static void free_value_data(struct svalue *v);
 static void serialize_object(struct callbacks *cb, lua_State *L,
-                             struct l_object *object);
+                             struct svalue *object);
 static int push_function(struct callbacks *cb, lua_State *L,
                          struct upvalue_cache *cache,
                          const struct sfunction *func, const char *name,
                          void **object_key);
 static void push_object(struct callbacks *cb, lua_State *L,
                         struct upvalue_cache *cache,
-                        const struct l_object *object);
+                        const struct svalue *object);
 
 
 static void free_table_entry(struct stable_entry *e)
 {
-        free_object_data(&e->key);
-        free_object_data(&e->value);
+        free_value_data(&e->key);
+        free_value_data(&e->value);
         free(e);
 }
 
@@ -119,24 +119,24 @@ static void free_table(struct stable *t)
         }
 }
 
-static void free_object_data(struct l_object *o)
+static void free_value_data(struct svalue *v)
 {
-        if (!o)
+        if (!v)
                 return;
 
-        switch (o->type) {
+        switch (v->type) {
         case LUA_TBOOLEAN:
         case LUA_TNUMBER:
                 /* nothing to do */
                 break;
         case LUA_TSTRING:
-                free(o->string);
+                free(v->string);
                 break;
         case LUA_TFUNCTION:
-                free_sfunction(o->function);
+                free_sfunction(v->function);
                 break;
         case LUA_TTABLE:
-                free_table(o->table);
+                free_table(v->table);
                 break;
         default:
                 assert(false);
@@ -161,7 +161,7 @@ static void free_upvalue(struct supvalue *v)
         if (!v)
                 return;
 
-        free_object_data(&v->value);
+        free_value_data(&v->value);
         free(v);
 }
 
@@ -271,7 +271,7 @@ static struct stable *serialize_table(struct callbacks *cb, lua_State *L)
 }
 
 static void serialize_object(struct callbacks *cb, lua_State *L,
-                             struct l_object *object)
+                             struct svalue *object)
 {
         object->type = lua_type(L, -1);
 
@@ -472,7 +472,7 @@ static void push_table(struct callbacks *cb, lua_State *L,
 
 static void push_object(struct callbacks *cb, lua_State *L,
                         struct upvalue_cache *cache,
-                        const struct l_object *object)
+                        const struct svalue *object)
 {
         switch (object->type) {
         case LUA_TBOOLEAN:
