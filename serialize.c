@@ -96,7 +96,7 @@ static void push_object(struct callbacks *cb, lua_State *L,
                         const struct l_object *object);
 
 
-static void table_entry_free(struct l_table_entry *e)
+static void free_table_entry(struct l_table_entry *e)
 {
         l_object_free_data(&e->key);
         l_object_free_data(&e->value);
@@ -108,7 +108,7 @@ static void table_free_entries(struct l_table_entry *entries)
         struct l_table_entry *e;
 
         LIST_FOR_EACH (entries, e)
-                table_entry_free(e);
+                free_table_entry(e);
 }
 
 static void table_free(struct l_table *t)
