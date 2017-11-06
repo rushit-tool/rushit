@@ -31,7 +31,7 @@ struct l_object {
                 bool boolean;
                 lua_Number number;
                 char *string;
-                struct l_function *function;
+                struct sfunction *function;
                 struct l_table *table;
         };
 };
@@ -54,7 +54,7 @@ struct l_table {
         struct l_table_entry *entries;
 };
 
-struct l_function {
+struct sfunction {
         void *id;
         struct byte_array *code;
         struct l_upvalue *upvalues;
@@ -89,7 +89,7 @@ static void serialize_object(struct callbacks *cb, lua_State *L,
                              struct l_object *object);
 static int push_function(struct callbacks *cb, lua_State *L,
                          struct upvalue_cache *cache,
-                         const struct l_function *func, const char *name,
+                         const struct sfunction *func, const char *name,
                          void **object_key);
 static void push_object(struct callbacks *cb, lua_State *L,
                         struct upvalue_cache *cache,
@@ -133,7 +133,7 @@ static void free_object_data(struct l_object *o)
                 free(o->string);
                 break;
         case LUA_TFUNCTION:
-                l_function_free(o->function);
+                free_sfunction(o->function);
                 break;
         case LUA_TTABLE:
                 free_table(o->table);
@@ -179,7 +179,7 @@ static void free_upvalues(struct l_upvalue **head)
         *head = NULL;
 }
 
-void l_function_free(struct l_function *f)
+void free_sfunction(struct sfunction *f)
 {
         if (f) {
                 byte_array_free(f->code);
@@ -352,9 +352,9 @@ static struct l_upvalue *serialize_upvalues(struct callbacks *cb, lua_State *L)
         return list;
 }
 
-struct l_function *serialize_function(struct callbacks *cb, lua_State *L)
+struct sfunction *serialize_function(struct callbacks *cb, lua_State *L)
 {
-        struct l_function *f;
+        struct sfunction *f;
 
         f = calloc(1, sizeof(*f));
         assert(f);
@@ -570,7 +570,7 @@ static void set_shared_upvalue(struct callbacks *cb, lua_State *L,
 
 static int push_function(struct callbacks *cb, lua_State *L,
                          struct upvalue_cache *cache,
-                         const struct l_function *func, const char *name,
+                         const struct sfunction *func, const char *name,
                          void **object_key)
 {
         struct l_upvalue *v;
@@ -601,7 +601,7 @@ static int push_function(struct callbacks *cb, lua_State *L,
 
 int deserialize_function(struct callbacks *cb, lua_State *L,
                          struct upvalue_cache *cache, int cache_idx,
-                         const struct l_function *func, const char *name,
+                         const struct sfunction *func, const char *name,
                          void **object_key)
 {
         assert(cache);

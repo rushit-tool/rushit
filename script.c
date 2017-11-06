@@ -278,7 +278,7 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
         se->L = NULL;
 
         for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++)
-                l_function_free(h->function);
+                free_sfunction(h->function);
 
         free(se);
         return NULL;
