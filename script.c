@@ -218,6 +218,22 @@ static void init_hook_names(struct script_engine *se)
                 se->hooks[hid].name = get_hook_name(se->run_mode, hid);
 }
 
+static int load_prelude(struct callbacks *cb, lua_State *L)
+{
+        int err;
+
+        lua_getglobal(L, "require");
+        lua_pushliteral(L, "script_prelude");
+        err = lua_pcall(L, 1, 0, 0);
+        if (err) {
+                LOG_ERROR(cb, "require('script_prelude'): %s",
+                          lua_tostring(L, -1));
+                return -errno_lua(err);
+        }
+
+        return 0;
+}
+
 /**
  * Create an instance of a script engine
  */
@@ -227,6 +243,7 @@ int script_engine_create(struct script_engine **sep, struct callbacks *cb,
         CLEANUP(free) struct script_engine *se = NULL;
         const struct luaL_Reg *f;
         lua_State *L;
+        int err;
 
         assert(sep);
 
@@ -247,6 +264,10 @@ int script_engine_create(struct script_engine **sep, struct callbacks *cb,
                 lua_register(L, f->name, f->func);
         for (f = common_callbacks; f->name; f++)
                 lua_register(L, f->name, f->func);
+
+        err = load_prelude(se->cb, L);
+        if (err)
+                return err;
 
         /* Set context for Lua to C callbacks */
         lua_pushlightuserdata(L, SCRIPT_ENGINE_KEY);
@@ -334,22 +355,6 @@ int script_engine_run_file(struct script_engine *se, const char *filename,
         assert(filename);
 
         return run_script(se, luaL_loadfile, filename, run_func, run_data);
-}
-
-static int load_prelude(struct callbacks *cb, lua_State *L)
-{
-        int err;
-
-        lua_getglobal(L, "require");
-        lua_pushliteral(L, "script_prelude");
-        err = lua_pcall(L, 1, 0, 0);
-        if (err) {
-                LOG_ERROR(cb, "require('script_prelude'): %s",
-                          lua_tostring(L, -1));
-                return -errno_lua(err);
-        }
-
-        return 0;
 }
 
 /**
