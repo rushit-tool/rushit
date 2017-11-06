@@ -35,7 +35,7 @@ struct upvalue_cache;
 
 
 struct upvalue_cache * upvalue_cache_new(void);
-void upvalue_cache_free(struct upvalue_cache *c);
+void free_upvalue_cache(struct upvalue_cache *c);
 
 void l_function_free(struct l_function *f);
 

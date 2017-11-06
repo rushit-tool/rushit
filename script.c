@@ -404,7 +404,7 @@ struct script_slave *script_slave_destroy(struct script_slave *ss)
         ss->L = NULL;
         ss->se = NULL;
 
-        upvalue_cache_free(ss->hook_upvalues);
+        free_upvalue_cache(ss->hook_upvalues);
 
         free(ss);
         return NULL;
