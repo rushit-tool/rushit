@@ -156,7 +156,7 @@ static struct l_upvalue *l_upvalue_new(void *id, int number)
         return v;
 }
 
-static void l_upvalue_free(struct l_upvalue *v)
+static void free_upvalue(struct l_upvalue *v)
 {
         if (!v)
                 return;
@@ -175,7 +175,7 @@ void destroy_upvalues(struct l_upvalue **head)
         assert(head);
 
         LIST_FOR_EACH (*head, v)
-                l_upvalue_free(v);
+                free_upvalue(v);
         *head = NULL;
 }
 
