@@ -103,15 +103,12 @@ static void table_entry_free(struct l_table_entry *e)
         free(e);
 }
 
-static void table_free_entries(struct l_table_entry *e)
+static void table_free_entries(struct l_table_entry *entries)
 {
-        struct l_table_entry *e_next;
+        struct l_table_entry *e;
 
-        while (e) {
-                e_next = e->next;
+        LIST_FOR_EACH (entries, e)
                 table_entry_free(e);
-                e = e_next;
-        }
 }
 
 static void table_free(struct l_table *t)
@@ -173,18 +170,13 @@ static void l_upvalue_free(struct l_upvalue *v)
  */
 void destroy_upvalues(struct l_upvalue **head)
 {
-        struct l_upvalue *v, *v_next;
+        struct l_upvalue *v;
 
         assert(head);
 
-        v = *head;
-        *head = NULL;
-
-        while (v) {
-                v_next = v->next;
+        LIST_FOR_EACH (*head, v)
                 l_upvalue_free(v);
-                v = v_next;
-        }
+        *head = NULL;
 }
 
 void l_function_free(struct l_function *f)
@@ -393,7 +385,7 @@ static const struct object_mapping *lookup_object(struct upvalue_cache *cache,
 {
         struct object_mapping *m;
 
-        for (m = cache->object_map; m; m = m->next) {
+        LIST_FOR_EACH (cache->object_map, m) {
                 if (m->key == key)
                         return m;
         }
@@ -452,7 +444,7 @@ static const struct upvalue_mapping *lookup_upvalue(struct upvalue_cache *cache,
 {
         struct upvalue_mapping *m;
 
-        for (m = cache->upvalue_map; m; m = m->next) {
+        LIST_FOR_EACH (cache->upvalue_map, m) {
                 if (m->key == key)
                         return m;
         }
@@ -471,7 +463,7 @@ static void push_table(struct callbacks *cb, lua_State *L,
         id = cache_object(cache, L);
         map_object(cache, table->id, id);
 
-        for (e = table->entries; e; e = e->next) {
+        LIST_FOR_EACH (table->entries, e) {
                 push_object(cb, L, cache, &e->key);
                 push_object(cb, L, cache, &e->value);
                 lua_rawset(L, -3);
@@ -522,26 +514,20 @@ struct upvalue_cache *upvalue_cache_new(void)
         return calloc(1, sizeof(struct upvalue_cache));
 }
 
-static void destroy_object_map(struct object_mapping *m)
+static void destroy_object_map(struct object_mapping *mappings)
 {
-        struct object_mapping *m_next;
+        struct object_mapping *m;
 
-        while (m) {
-                m_next = m->next;
+        LIST_FOR_EACH (mappings, m)
                 free(m);
-                m = m_next;
-        }
 }
 
-static void destroy_upvalue_map(struct upvalue_mapping *m)
+static void destroy_upvalue_map(struct upvalue_mapping *mappings)
 {
-        struct upvalue_mapping *m_next;
+        struct upvalue_mapping *m;
 
-        while (m) {
-                m_next = m->next;
+        LIST_FOR_EACH (mappings, m)
                 free(m);
-                m = m_next;
-        }
 }
 
 void upvalue_cache_free(struct upvalue_cache *c)
@@ -602,7 +588,7 @@ static int push_function(struct callbacks *cb, lua_State *L,
         map_object(cache, func->id, func_id);
 
         /* Set upvalues */
-        for (v = func->upvalues; v; v = v->next)
+        LIST_FOR_EACH (func->upvalues, v)
                 set_shared_upvalue(cb, L, cache, func_id, v);
 
         /* TODO: Push globals */
