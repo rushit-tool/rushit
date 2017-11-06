@@ -43,15 +43,15 @@ struct l_upvalue {
         struct l_object value;
 };
 
-struct l_table_entry {
-        struct l_table_entry *next;
+struct stable_entry {
+        struct stable_entry *next;
         struct l_object key;
         struct l_object value;
 };
 
 struct stable {
         void *id;
-        struct l_table_entry *entries;
+        struct stable_entry *entries;
 };
 
 struct sfunction {
@@ -96,16 +96,16 @@ static void push_object(struct callbacks *cb, lua_State *L,
                         const struct l_object *object);
 
 
-static void free_table_entry(struct l_table_entry *e)
+static void free_table_entry(struct stable_entry *e)
 {
         free_object_data(&e->key);
         free_object_data(&e->value);
         free(e);
 }
 
-static void free_table_entries(struct l_table_entry *entries)
+static void free_table_entries(struct stable_entry *entries)
 {
-        struct l_table_entry *e;
+        struct stable_entry *e;
 
         LIST_FOR_EACH (entries, e)
                 free_table_entry(e);
@@ -235,14 +235,14 @@ static int load_function_bytecode(struct callbacks *cb, lua_State *L,
         return 0;
 }
 
-static struct l_table_entry *dump_table_entries(struct callbacks *cb,
+static struct stable_entry *dump_table_entries(struct callbacks *cb,
                                                 lua_State *L)
 {
-        struct l_table_entry *head = NULL;
+        struct stable_entry *head = NULL;
 
         lua_pushnil(L);
         while (lua_next(L, -2)) {
-                struct l_table_entry *e = calloc(1, sizeof(*e));
+                struct stable_entry *e = calloc(1, sizeof(*e));
                 if (!e)
                         LOG_FATAL(cb, "calloc failed");
                 e->next = head;
@@ -455,7 +455,7 @@ static void push_table(struct callbacks *cb, lua_State *L,
                        struct upvalue_cache *cache,
                        struct stable *table)
 {
-        struct l_table_entry *e;
+        struct stable_entry *e;
         void *id;
 
         lua_newtable(L);
