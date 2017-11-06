@@ -103,7 +103,7 @@ static void free_table_entry(struct l_table_entry *e)
         free(e);
 }
 
-static void table_free_entries(struct l_table_entry *entries)
+static void free_table_entries(struct l_table_entry *entries)
 {
         struct l_table_entry *e;
 
@@ -114,7 +114,7 @@ static void table_free_entries(struct l_table_entry *entries)
 static void table_free(struct l_table *t)
 {
         if (t) {
-                table_free_entries(t->entries);
+                free_table_entries(t->entries);
                 free(t);
         }
 }
