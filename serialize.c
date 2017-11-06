@@ -32,7 +32,7 @@ struct l_object {
                 lua_Number number;
                 char *string;
                 struct sfunction *function;
-                struct l_table *table;
+                struct stable *table;
         };
 };
 
@@ -49,7 +49,7 @@ struct l_table_entry {
         struct l_object value;
 };
 
-struct l_table {
+struct stable {
         void *id;
         struct l_table_entry *entries;
 };
@@ -111,7 +111,7 @@ static void free_table_entries(struct l_table_entry *entries)
                 free_table_entry(e);
 }
 
-static void free_table(struct l_table *t)
+static void free_table(struct stable *t)
 {
         if (t) {
                 free_table_entries(t->entries);
@@ -257,9 +257,9 @@ static struct l_table_entry *dump_table_entries(struct callbacks *cb,
         return head;
 }
 
-static struct l_table *serialize_table(struct callbacks *cb, lua_State *L)
+static struct stable *serialize_table(struct callbacks *cb, lua_State *L)
 {
-        struct l_table *t;
+        struct stable *t;
 
         t = calloc(1, sizeof(*t));
         assert(t);
@@ -453,7 +453,7 @@ static const struct upvalue_mapping *lookup_upvalue(struct upvalue_cache *cache,
 
 static void push_table(struct callbacks *cb, lua_State *L,
                        struct upvalue_cache *cache,
-                       struct l_table *table)
+                       struct stable *table)
 {
         struct l_table_entry *e;
         void *id;
