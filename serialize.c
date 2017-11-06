@@ -111,7 +111,7 @@ static void free_table_entries(struct l_table_entry *entries)
                 free_table_entry(e);
 }
 
-static void table_free(struct l_table *t)
+static void free_table(struct l_table *t)
 {
         if (t) {
                 free_table_entries(t->entries);
@@ -136,7 +136,7 @@ static void l_object_free_data(struct l_object *o)
                 l_function_free(o->function);
                 break;
         case LUA_TTABLE:
-                table_free(o->table);
+                free_table(o->table);
                 break;
         default:
                 assert(false);
