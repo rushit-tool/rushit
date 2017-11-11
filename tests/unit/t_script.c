@@ -295,7 +295,7 @@ static void t_run_recverr_hook(void **state)
 
 #define lua_assert(expr, op, val) lua_assert_(#expr, #op, #val)
 #define lua_assert_(expr, op, val) \
-        "assert(" expr op val ", \"expected " expr " to be " val ", got \" .. tostring(" expr "));"
+        "assert(" expr " " op " " val ", \"expected " expr " to be " val ", got \" .. tostring(" expr "));\n"
 
 #define lua_assert_nil(expr) lua_assert(expr, ==, nil)
 #define lua_assert_not_nil(expr) lua_assert(expr, ~=, nil)
