@@ -32,6 +32,7 @@ struct callbacks;
 
 /* Serialized Lua function together with its upvalues. */
 struct sfunction;
+struct svalue;
 struct upvalue_cache;
 
 
@@ -39,6 +40,12 @@ struct upvalue_cache * upvalue_cache_new(void);
 void free_upvalue_cache(struct upvalue_cache *c);
 
 void free_sfunction(struct sfunction *f);
+void free_svalue(struct svalue *v);
+
+struct svalue *serialize_value(struct callbacks *cb, lua_State *L);
+void deserialize_value(struct callbacks *cb, lua_State *L,
+                       struct upvalue_cache *cache, int cache_idx,
+                       const struct svalue *value);
 
 /**
  * Serializes the Lua function at the top of the stack.

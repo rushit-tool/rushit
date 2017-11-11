@@ -611,3 +611,30 @@ int deserialize_function(struct callbacks *cb, lua_State *L,
 
         return push_function(cb, L, cache, func, name, object_key);
 }
+
+struct svalue *serialize_value(struct callbacks *cb, lua_State *L)
+{
+        struct svalue *sv;
+
+        sv = calloc(1, sizeof(*sv));
+        assert(sv);
+        serialize_object(cb, L, sv);
+
+        return sv;
+}
+
+void deserialize_value(struct callbacks *cb, lua_State *L,
+                       struct upvalue_cache *cache, int cache_idx,
+                       const struct svalue *value)
+{
+        cache->object_tbl_idx = cache_idx;
+        push_object(cb, L, cache, value);
+}
+
+void free_svalue(struct svalue *value)
+{
+        if (value) {
+                free_value_data(value);
+                free(value);
+        }
+}
