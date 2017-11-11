@@ -66,6 +66,7 @@ struct script_engine {
         void (*run_func)(struct script_engine *, void *);
         void *run_data;
         int run_mode;
+        struct collector *collectors;
 };
 
 struct script_slave {

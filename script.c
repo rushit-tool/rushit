@@ -31,6 +31,11 @@
 
 enum run_mode { CLIENT, SERVER };
 
+struct collector {
+        struct collector *next;
+        void *id;
+};
+
 /*
  * Keys to Lua registry where we store hook functions and context.
  */
@@ -156,12 +161,56 @@ static int is_server_cb(lua_State *L)
         return 0;
 }
 
+static int register_collector_cb(lua_State *L)
+{
+        struct script_engine *se;
+        struct collector *c;
+
+        luaL_checktype(L, -1, LUA_TTABLE);
+
+        c = calloc(1, sizeof(*c));
+        assert(c);
+
+        c->id = (void *) lua_topointer(L, -1);
+        lua_pushlightuserdata(L, c->id);
+        lua_insert(L, -2);
+        lua_rawset(L, LUA_REGISTRYINDEX);
+
+        se = get_context(L);
+        c->next = se->collectors;
+        se->collectors = c;
+
+        return 0;
+}
+
+static void empty_collectors(struct collector *collectors, lua_State *L)
+{
+        struct collector *c;
+
+        LIST_FOR_EACH (collectors, c) {
+                /* Fetch collector */
+                lua_pushlightuserdata(L, c->id);
+                lua_rawget(L, LUA_REGISTRYINDEX);
+
+                assert(lua_type(L, -1) == LUA_TTABLE);
+                assert(lua_objlen(L, -1) == 1);
+
+                /* Remove its only element */
+                lua_pushnil(L);
+                lua_rawseti(L, -2, 1);
+
+                lua_pop(L, 1);  /* collector */
+        }
+}
+
 static int run_cb(lua_State *L)
 {
         struct script_engine *se;
 
         se = get_context(L);
         if (se->run_func) {
+                empty_collectors(se->collectors, L);
+
                 (*se->run_func)(se, se->run_data);
                 se->run_func = NULL; /* runs only once */
         }
@@ -195,6 +244,7 @@ static const struct luaL_Reg server_callbacks[] = {
 static const struct luaL_Reg common_callbacks[] = {
         { "is_client", is_client_cb },
         { "is_server", is_server_cb },
+        { "register_collector__", register_collector_cb },
         { "run",       run_cb },
         { "tid_iter",  tid_iter_cb },
         { NULL, NULL } /* sentinel */
@@ -292,6 +342,7 @@ int script_engine_create(struct script_engine **sep, struct callbacks *cb,
 struct script_engine *script_engine_destroy(struct script_engine *se)
 {
         struct script_hook *h;
+        struct collector *c;
 
         assert(se);
 
@@ -300,6 +351,9 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
 
         for (h = se->hooks; h < se->hooks + SCRIPT_HOOK_MAX; h++)
                 free_sfunction(h->function);
+
+        LIST_FOR_EACH (se->collectors, c)
+                free(c);
 
         free(se);
         return NULL;
@@ -361,6 +415,7 @@ int script_engine_run_file(struct script_engine *se, const char *filename,
         return run_script(se, luaL_loadfile, filename, run_func, run_data);
 }
 
+
 void script_engine_push_data(struct script_engine *se, struct script_slave *ss)
 {
         /* TODO: Transfer hooks & their upvalues to slave */
@@ -368,11 +423,61 @@ void script_engine_push_data(struct script_engine *se, struct script_slave *ss)
         (void) ss;
 }
 
+static struct svalue *get_collected_value(struct script_slave *ss, void *collector_id)
+{
+        lua_State *L = ss->L;
+        struct svalue *sv = NULL;
+
+        push_collected_value(ss->cb, L, ss->hook_upvalues,
+                             LUA_REGISTRYINDEX, collector_id);
+        sv = serialize_value(ss->cb, L);
+        lua_pop(L, 1); /* collected value */
+
+        return sv;
+}
+
+static void add_collected_value(struct script_engine *se,
+                                struct upvalue_cache *cache, int cache_idx,
+                                void *collector_id, const struct svalue *value)
+{
+        lua_State *L = se->L;
+        int n;
+
+        /* Fetch collector table */
+        lua_pushlightuserdata(L, collector_id);
+        lua_rawget(L, LUA_REGISTRYINDEX);
+        n = lua_objlen(L, -1);
+
+        /* Append deserialized collected value */
+        deserialize_value(se->cb, L, cache, cache_idx, value);
+        lua_rawseti(L, -2, n + 1);
+
+        lua_pop(L, 1); /* collector table */
+}
+
 void script_engine_pull_data(struct script_engine *se, struct script_slave *ss)
 {
-        /* TODO: Transfer data from slave engines to main engine */
-        (void) se;
-        (void) ss;
+        struct upvalue_cache *cache;
+        int cache_idx;
+        struct collector *c;
+
+        assert(se);
+        assert(ss);
+
+        cache = upvalue_cache_new();
+        lua_newtable(se->L);
+        cache_idx = lua_gettop(se->L);
+
+        LIST_FOR_EACH (se->collectors, c) {
+                struct svalue *sv;
+
+                sv = get_collected_value(ss, c->id);
+                add_collected_value(se, cache, cache_idx, c->id, sv);
+                free_svalue(sv);
+        }
+
+        lua_pop(se->L, 1); /* cache tbl */
+        free_upvalue_cache(cache);
 }
 
 /**

@@ -777,6 +777,150 @@ static void t_hook_can_access_function_with_function_upvalue(void **state)
         assert_return_code(r, -r);
 }
 
+static void t_collected_upvalues_get_unwrapped(void **state)
+{
+        const char *script =
+                "local n = collect(42);"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(n, 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void t_collected_table_elements_get_unwrapped(void **state)
+{
+        const char *script =
+                "local t = { collect(42) };"
+                "client_socket("
+                "  function ()"
+                "    " lua_assert_equal(t[1], 42)
+                "    return 0;"
+                "  end"
+                ");";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, NULL, NULL);
+        assert_return_code(r, -r);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+}
+
+static void dummy_run(struct script_engine *se, void *ss_)
+{
+        struct script_slave *ss = ss_;
+        int r;
+
+        script_engine_push_data(se, ss);
+
+        r = script_slave_socket_hook(ss, -1, NULL);
+        assert_return_code(r, -r);
+
+        script_engine_pull_data(se, ss);
+}
+
+
+static void t_collect_upvalue(void **state)
+{
+        const char *script =
+                "local b = collect(false);"
+                "local n = collect(0);"
+                "local s = collect('');"
+                "local t = collect({ b2 = false, n2 = 0, s2 = '' });"
+                "local t2 = collect({ { b3 = false }, { n3 = 0 }, { s3 = '' } });"
+                "client_socket("
+                "  function ()"
+                "    b = true;"
+                "    n = 42;"
+                "    s = 'foo';"
+                "    t.b2 = true;"
+                "    t.n2 = 24;"
+                "    t.s2 = 'bar';"
+                "    t2[1].b3 = true;"
+                "    t2[2].n3 = 84;"
+                "    t2[3].s3 = 'baz';"
+                "    return 0;"
+                "  end"
+                ");"
+                "run();"
+                "" lua_assert_equal(#b, 1)
+                "" lua_assert_true(b[1])
+                "" lua_assert_equal(#n, 1)
+                "" lua_assert_equal(n[1], 42)
+                "" lua_assert_equal(#s, 1)
+                "" lua_assert_equal(s[1], 'foo')
+                "" lua_assert_equal(#t, 1)
+                "" lua_assert_true(t[1].b2)
+                "" lua_assert_equal(t[1].n2, 24)
+                "" lua_assert_equal(t[1].s2, 'bar')
+                "" lua_assert_equal(#t2, 1)
+                "" lua_assert_true(t2[1][1].b3)
+                "" lua_assert_equal(t2[1][2].n3, 84)
+                "" lua_assert_equal(t2[1][3].s3, 'baz')
+                "";
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, dummy_run, ss);
+        assert_return_code(r, -r);
+}
+
+static void t_collect_table_element(void **state)
+{
+        const char *script =
+                "local t1 = { collect(0) };"
+                "local t2 = { b = collect(false), s = collect('') };"
+                "local t3 = { t = collect({}) };"
+                "client_socket("
+                "  function ()"
+                "    t1[1] = 42;"
+                "    t2.b = true;"
+                "    t2.s = 'foo';"
+                "    t3.t[1] = 24;"
+                "    return 0;"
+                "  end"
+                ");"
+                "run();"
+                lua_assert_not_equal(#t1[1], nil) /* a value */
+                lua_assert_equal(#t1[1], 1)       /* 1 entry table */
+                lua_assert_equal(t1[1][1], 42)    /* 1st entry is 42 */
+
+                lua_assert_not_equal(#t2.b, nil) /* a value */
+                lua_assert_equal(#t2.b, 1)       /* 1 entry table */
+                lua_assert_true(t2.b[1])         /* 1st entry is true */
+
+                lua_assert_not_equal(#t2.s, nil) /* a value */
+                lua_assert_equal(#t2.s, 1)       /* 1 entry table */
+                lua_assert_equal(t2.s[1], 'foo') /* 1st entry is 'foo' */
+
+                lua_assert_not_equal(#t3.t, nil)   /* a value */
+                lua_assert_equal(#t3.t, 1)         /* 1 entry table */
+                lua_assert_not_equal(t3.t[1], nil) /* 1st entry is a value */
+                lua_assert_equal(#t3.t[1], 1)      /* 1st entry is 1 entry table */
+                lua_assert_equal(t3.t[1][1], 24)   /* 1st entry of 1st entry is 24 */
+                ;
+        struct script_slave *ss = *state;
+        struct script_engine *se = ss->se;
+        int r;
+
+        r = script_engine_run_string(se, script, dummy_run, ss);
+        assert_return_code(r, -r);
+}
+
 #define clinet_engine_unit_test(f) \
         cmocka_unit_test_setup_teardown((f), client_engine_setup, client_engine_teardown)
 #define client_slave_unit_test(f) \
@@ -813,6 +957,10 @@ int main(void)
                 client_slave_unit_test(t_hook_can_access_function_with_basic_upvalues),
                 client_slave_unit_test(t_hook_can_access_function_with_table_upvalue),
                 client_slave_unit_test(t_hook_can_access_function_with_function_upvalue),
+                client_slave_unit_test(t_collected_upvalues_get_unwrapped),
+                client_slave_unit_test(t_collect_upvalue),
+                client_slave_unit_test(t_collected_table_elements_get_unwrapped),
+                client_slave_unit_test(t_collect_table_element),
         };
 
         return cmocka_run_group_tests(tests, common_setup, common_teardown);

@@ -1,6 +1,20 @@
 local F = require("ffi")
 local S = require("syscall")
 
+-- Mark a local variable for collection by assiging it a special wrapped value.
+--
+-- Collected locals will be assigned a table of values gathered from all worker
+-- Lua states after run() has been called.
+function collect(value)
+  local collector = { value }
+  local collector_mt = { collector = true }
+
+  setmetatable(collector, collector_mt)
+  register_collector__(collector)
+
+  return collector;
+end
+
 -- XXX: Push to ljsyscall?
 F.cdef[[
 struct addrinfo {
