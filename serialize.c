@@ -424,16 +424,16 @@ static bool lookup_and_fetch_object(struct upvalue_cache *cache, lua_State *L,
         return false;
 }
 
-static void map_upvalue(struct upvalue_cache *cache, void *key,
-                        void *function_id, int upvalue_num)
+static void map_upvalue(struct upvalue_cache *cache,
+                        const struct supvalue *upvalue, void *function_id)
 {
         struct upvalue_mapping *m;
 
         m = calloc(1, sizeof(*m));
         assert(m);
-        m->key = key;
+        m->key = upvalue->id;
         m->function_id = function_id;
-        m->upvalue_num = upvalue_num;
+        m->upvalue_num = upvalue->number;
 
         m->next = cache->upvalue_map;
         cache->upvalue_map = m;
@@ -563,8 +563,7 @@ static void set_shared_upvalue(struct callbacks *cb, lua_State *L,
         } else {
                 /* Upvalue seen for the first time */
                 set_upvalue(cb, L, upvalue_cache, upvalue);
-                map_upvalue(upvalue_cache, upvalue->id,
-                            func_id, upvalue->number);
+                map_upvalue(upvalue_cache, upvalue, func_id);
         }
 }
 
