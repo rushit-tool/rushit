@@ -41,12 +41,15 @@ struct supvalue {
         void *id;
         int number;
         struct svalue value;
+        void *collector_id;
 };
 
 struct stable_entry {
         struct stable_entry *next;
         struct svalue key;
         struct svalue value;
+        /* Collector object for the entry value */
+        void *collector_id;
 };
 
 struct stable {
@@ -73,12 +76,25 @@ struct object_mapping {
         void *object_id;
 };
 
+/* Keyed by collector object ID */
+struct collector_mapping {
+        struct collector_mapping *next;
+        /* collector object from which value was extracted */
+        void *key;
+        /* function or table */
+        void *object_id;
+        /* upvalue number or table key */
+        struct svalue value_key;
+};
+
 struct upvalue_cache {
         /* Map of serialized upvalue ids to deserialized (function id, upvalue
          * number) tuples */
         struct upvalue_mapping *upvalue_map;
         /* Map of serialized object ids to deserialized object ids */
         struct object_mapping *object_map;
+        /* Map of collector object ids to (function, upvalue number) or (table, key) pairs */
+        struct collector_mapping *collector_map;
         /* Lua store for deserialized objects indexed by their id */
         int object_tbl_idx;
 };
@@ -235,6 +251,31 @@ static int load_function_bytecode(struct callbacks *cb, lua_State *L,
         return 0;
 }
 
+/* Pushes the first element of the table onto the stack, if the object on top of
+ * a stack is a table that has a 'collector' meta-field.
+ */
+static void *unwrap_collector_maybe(lua_State *L)
+{
+        void *collector_id = NULL;
+        bool exists;
+
+        exists = luaL_getmetafield(L, -1, "collector");
+        if (exists) {
+                /* field value doesn't matter */
+                lua_pop(L, 1);
+
+                collector_id = (void *) lua_topointer(L, -1);
+
+                /* push wrapped value */
+                lua_rawgeti(L, -1, 1);
+
+                /* remove wrapper */
+                lua_remove(L, -2);
+        }
+
+        return collector_id;
+}
+
 static struct stable_entry *dump_table_entries(struct callbacks *cb,
                                                 lua_State *L)
 {
@@ -248,6 +289,7 @@ static struct stable_entry *dump_table_entries(struct callbacks *cb,
                 e->next = head;
                 head = e;
 
+                e->collector_id = unwrap_collector_maybe(L);
                 serialize_object(cb, L, &e->value);
                 lua_pop(L, 1);
                 serialize_object(cb, L, &e->key);
@@ -318,6 +360,7 @@ struct supvalue *serialize_upvalue(struct callbacks *cb, lua_State *L,
         struct supvalue *v;
 
         v = l_upvalue_new(id, number);
+        v->collector_id = unwrap_collector_maybe(L);
         serialize_object(cb, L, &v->value);
 
         return v;
@@ -378,6 +421,33 @@ static void map_object(struct upvalue_cache *cache, void *key,
 
         m->next = cache->object_map;
         cache->object_map = m;
+}
+
+static void copy_value(const struct svalue *src, struct svalue *dst)
+{
+        assert(src->type == LUA_TBOOLEAN ||
+               src->type == LUA_TNUMBER ||
+               src->type == LUA_TSTRING);
+
+        memcpy(dst, src, sizeof(*dst));
+        if (src->type == LUA_TSTRING)
+                dst->string = strdup(src->string);
+}
+
+static void map_collector(struct upvalue_cache *cache,
+                          void *key, void *object_id,
+                          const struct svalue *value_key)
+{
+        struct collector_mapping *m;
+
+        m = calloc(1, sizeof(*m));
+        assert(m);
+        m->key = key;
+        m->object_id = object_id;
+        copy_value(value_key, &m->value_key);
+
+        m->next = cache->collector_map;
+        cache->collector_map = m;
 }
 
 static const struct object_mapping *lookup_object(struct upvalue_cache *cache,
@@ -467,6 +537,11 @@ static void push_table(struct callbacks *cb, lua_State *L,
                 push_object(cb, L, cache, &e->key);
                 push_object(cb, L, cache, &e->value);
                 lua_rawset(L, -3);
+
+                if (e->collector_id) {
+                        map_collector(cache, e->collector_id,
+                                      tid, &e->key);
+                }
         }
 }
 
@@ -530,11 +605,22 @@ static void free_upvalue_mappings(struct upvalue_mapping *mappings)
                 free(m);
 }
 
+static void free_collector_mappings(struct collector_mapping *mappings)
+{
+        struct collector_mapping *m;
+
+        LIST_FOR_EACH (mappings, m) {
+                free_value_data(&m->value_key);
+                free(m);
+        }
+}
+
 void free_upvalue_cache(struct upvalue_cache *c)
 {
         if (c) {
                 free_object_mappings(c->object_map);
                 free_upvalue_mappings(c->upvalue_map);
+                free_collector_mappings(c->collector_map);
                 free(c);
         }
 }
@@ -564,6 +650,15 @@ static void set_shared_upvalue(struct callbacks *cb, lua_State *L,
                 /* Upvalue seen for the first time */
                 set_upvalue(cb, L, upvalue_cache, upvalue);
                 map_upvalue(upvalue_cache, upvalue, func_id);
+
+                if (upvalue->collector_id) {
+                        struct svalue vkey = {
+                                .type = LUA_TNUMBER,
+                                .number = upvalue->number,
+                        };
+                        map_collector(upvalue_cache, upvalue->collector_id,
+                                      func_id, &vkey);
+                }
         }
 }
 
@@ -637,4 +732,36 @@ void free_svalue(struct svalue *value)
                 free_value_data(value);
                 free(value);
         }
+}
+
+void push_collected_value(struct callbacks *cb, lua_State *L,
+                          struct upvalue_cache *cache, int cache_idx,
+                          void *collector_id)
+{
+        struct collector_mapping *m;
+
+        cache->object_tbl_idx = cache_idx;
+
+        LIST_FOR_EACH (cache->collector_map, m) {
+                if (m->key != collector_id)
+                        continue;
+
+                fetch_object(cache, L, m->object_id);
+                if (lua_isfunction(L, -1)) {
+                        const char *name;
+
+                        name = lua_getupvalue(L, -1, m->value_key.number);
+                        assert(name);
+                } else if (lua_istable(L, -1)) {
+                        push_object(cb, L, cache, &m->value_key);
+                        lua_rawget(L, -2);
+                } else {
+                        LOG_FATAL(cb, "Expected function or table object but got %s",
+                                  lua_typename(L, lua_type(L, -1)));
+                }
+                lua_remove(L, -2); /* fetched object */
+                return; /* got it */
+        }
+
+        lua_pushnil(L); /* not found */
 }
