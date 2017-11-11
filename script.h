@@ -91,6 +91,20 @@ int script_engine_run_file(struct script_engine *se, const char *filename,
                            void *data);
 
 /**
+ * Push script values needed to execute hook functions to slave engine.
+ *
+ * To be called from the main context when slave engine is no longer running.
+ */
+void script_engine_push_data(struct script_engine *se, struct script_slave *ss);
+
+/**
+ * Pull (collect) script values modified by hook functions from slave engine.
+ *
+ * To be called from the main context when slave engine is no longer running.
+ */
+void script_engine_pull_data(struct script_engine *se, struct script_slave *ss);
+
+/**
  * Run post-create socket hook.
  */
 int script_slave_socket_hook(struct script_slave *ss, int sockfd, struct addrinfo *ai);

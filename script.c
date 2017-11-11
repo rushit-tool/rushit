@@ -361,6 +361,20 @@ int script_engine_run_file(struct script_engine *se, const char *filename,
         return run_script(se, luaL_loadfile, filename, run_func, run_data);
 }
 
+void script_engine_push_data(struct script_engine *se, struct script_slave *ss)
+{
+        /* TODO: Transfer hooks & their upvalues to slave */
+        (void) se;
+        (void) ss;
+}
+
+void script_engine_pull_data(struct script_engine *se, struct script_slave *ss)
+{
+        /* TODO: Transfer data from slave engines to main engine */
+        (void) se;
+        (void) ss;
+}
+
 /**
  * Create an instance of a slave script engine
  */
