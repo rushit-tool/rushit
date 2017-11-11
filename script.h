@@ -56,16 +56,17 @@ enum script_hook_id {
 
 struct script_hook {
         const char *name;
-        struct l_function *function;
+        struct sfunction *function;
 };
 
 struct script_engine {
         struct lua_State *L;
         struct callbacks *cb;
         struct script_hook hooks[SCRIPT_HOOK_MAX];
-        void (*run_func)(void *);
+        void (*run_func)(struct script_engine *, void *);
         void *run_data;
         int run_mode;
+        struct collector *collectors;
 };
 
 struct script_slave {
@@ -84,9 +85,25 @@ int script_slave_create(struct script_slave **ssp, struct script_engine *se);
 struct script_slave *script_slave_destroy(struct script_slave *ss);
 
 int script_engine_run_string(struct script_engine *se, const char *script,
-                             void (*run_func)(void *), void *run_data);
+                             void (*run_func)(struct script_engine *, void *),
+                             void *run_data);
 int script_engine_run_file(struct script_engine *se, const char *filename,
-                           void (*run_func)(void *), void *data);
+                           void (*run_func)(struct script_engine *, void *),
+                           void *data);
+
+/**
+ * Push script values needed to execute hook functions to slave engine.
+ *
+ * To be called from the main context when slave engine is no longer running.
+ */
+void script_engine_push_data(struct script_engine *se, struct script_slave *ss);
+
+/**
+ * Pull (collect) script values modified by hook functions from slave engine.
+ *
+ * To be called from the main context when slave engine is no longer running.
+ */
+void script_engine_pull_data(struct script_engine *se, struct script_slave *ss);
 
 /**
  * Run post-create socket hook.

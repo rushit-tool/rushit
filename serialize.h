@@ -30,29 +30,41 @@
 
 struct callbacks;
 
-struct l_function;
+/* Serialized Lua function together with its upvalues. */
+struct sfunction;
+struct svalue;
 struct upvalue_cache;
 
 
 struct upvalue_cache * upvalue_cache_new(void);
-void upvalue_cache_free(struct upvalue_cache *c);
+void free_upvalue_cache(struct upvalue_cache *c);
 
-void l_function_free(struct l_function *f);
+void free_sfunction(struct sfunction *f);
+void free_svalue(struct svalue *v);
+
+struct svalue *serialize_value(struct callbacks *cb, lua_State *L);
+void deserialize_value(struct callbacks *cb, lua_State *L,
+                       struct upvalue_cache *cache, int cache_idx,
+                       const struct svalue *value);
 
 /**
  * Serializes the Lua function at the top of the stack.
  */
-struct l_function *serialize_function(struct callbacks *cb, lua_State *L);
+struct sfunction *serialize_function(struct callbacks *cb, lua_State *L);
 
 /**
- * Deserializes the function and leaves it on top the stack.
+ * Deserializes the function and pushes it on top the stack.
  *
  * Caches the deserialized objects so that they can be shared with other
  * deserialized functions.
  */
 int deserialize_function(struct callbacks *cb, lua_State *L,
                          struct upvalue_cache *cache, int cache_idx,
-                         const struct l_function *func, const char *name,
+                         const struct sfunction *func, const char *name,
                          void **object_key);
+
+void push_collected_value(struct callbacks *cb, lua_State *L,
+                          struct upvalue_cache *cache, int cache_idx,
+                          void *collector_id);
 
 #endif

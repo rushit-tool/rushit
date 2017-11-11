@@ -200,12 +200,32 @@ static void free_worker_threads(int num_threads, struct thread *t)
         free(t);
 }
 
-static void run_worker_threads(void *ctx_)
+static void push_script_data(struct script_engine *se, struct thread *workers,
+                             int n_workers)
+{
+        struct thread *t;
+
+        for (t = workers; t < workers + n_workers; t++)
+                script_engine_push_data(se, t->script_slave);
+}
+
+static void pull_script_data(struct script_engine *se, struct thread *workers,
+                             int n_workers)
+{
+        struct thread *t;
+
+        for (t = workers; t < workers + n_workers; t++)
+                script_engine_pull_data(se, t->script_slave);
+}
+
+static void run_worker_threads(struct script_engine *se, void *ctx_)
 {
         struct main_context *ctx = ctx_;
         struct callbacks *cb = ctx->cb;
         struct options *opts = ctx->opts;
         struct rusage_interval *rui = &ctx->rusage_ival;
+
+        push_script_data(se, ctx->workers, ctx->n_workers);
 
         start_worker_threads(cb, ctx, opts->pin_cpu);
         LOG_INFO(cb, "started worker threads");
@@ -219,6 +239,8 @@ static void run_worker_threads(void *ctx_)
 
         stop_worker_threads(cb, ctx);
         LOG_INFO(cb, "stopped worker threads");
+
+        pull_script_data(se, ctx->workers, ctx->n_workers);
 }
 
 static void report_rusage(struct callbacks *cb,
@@ -299,7 +321,7 @@ int run_main_thread(struct options *opts, struct callbacks *cb,
                         LOG_FATAL(cb, "script failed: %s: %s",
                                   opts->script, strerror(-r));
         } else {
-                run_worker_threads(ctx);
+                run_worker_threads(se, ctx);
         }
 
         r = pthread_barrier_destroy(ready);

@@ -36,6 +36,14 @@
 #define ARRAY_SIZE(a) (sizeof((a))/sizeof((a)[0]))
 #define UNUSED(x) ((void) (x))
 
+/* Walk over a list of structures linked through a 'next' field.
+ * Safe for use when removing an element from the list. */
+#define LIST_FOR_EACH(head, iter) \
+        for (__typeof__((iter)) _next = NULL, (iter) = (head); \
+             (iter) != NULL && (_next = (iter)->next, true); \
+             (iter) = (_next))
+
+
 struct script_slave;
 
 struct byte_array {
