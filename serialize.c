@@ -456,12 +456,12 @@ static void push_table(struct callbacks *cb, lua_State *L,
                        struct stable *table)
 {
         struct stable_entry *e;
-        void *id;
+        void *tid;
 
         lua_newtable(L);
 
-        id = cache_object(cache, L);
-        map_object(cache, table->id, id);
+        tid = cache_object(cache, L);
+        map_object(cache, table->id, tid);
 
         LIST_FOR_EACH (table->entries, e) {
                 push_object(cb, L, cache, &e->key);
