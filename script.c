@@ -197,7 +197,7 @@ static const struct luaL_Reg common_callbacks[] = {
         { "is_server", is_server_cb },
         { "run",       run_cb },
         { "tid_iter",  tid_iter_cb },
-        { NULL, NULL },
+        { NULL, NULL } /* sentinel */
 };
 
 static const char *get_hook_name(enum run_mode mode, enum script_hook_id hid)
