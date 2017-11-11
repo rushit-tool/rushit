@@ -46,7 +46,7 @@ void free_sfunction(struct sfunction *f);
 struct sfunction *serialize_function(struct callbacks *cb, lua_State *L);
 
 /**
- * Deserializes the function and leaves it on top the stack.
+ * Deserializes the function and pushes it on top the stack.
  *
  * Caches the deserialized objects so that they can be shared with other
  * deserialized functions.
