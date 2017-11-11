@@ -162,7 +162,7 @@ static int run_cb(lua_State *L)
 
         se = get_context(L);
         if (se->run_func) {
-                (*se->run_func)(se->run_data);
+                (*se->run_func)(se, se->run_data);
                 se->run_func = NULL; /* runs only once */
         }
 
@@ -306,8 +306,10 @@ struct script_engine *script_engine_destroy(struct script_engine *se)
 }
 
 static int run_script(struct script_engine *se,
-                      int (*load_func)(lua_State *, const char *), const char *input,
-                      void (*run_func)(void *data), void *run_data)
+                      int (*load_func)(lua_State *, const char *),
+                      const char *input,
+                      void (*run_func)(struct script_engine *, void *data),
+                      void *run_data)
 {
         int err;
 
@@ -337,7 +339,8 @@ static int run_script(struct script_engine *se,
  * Runs the script passed in a string.
  */
 int script_engine_run_string(struct script_engine *se, const char *script,
-                             void (*run_func)(void *), void *run_data)
+                             void (*run_func)(struct script_engine *, void *),
+                             void *run_data)
 {
         assert(se);
         assert(script);
@@ -349,7 +352,8 @@ int script_engine_run_string(struct script_engine *se, const char *script,
  * Runs the script from a given file.
  */
 int script_engine_run_file(struct script_engine *se, const char *filename,
-                            void (*run_func)(void *), void *run_data)
+                           void (*run_func)(struct script_engine *, void *),
+                           void *run_data)
 {
         assert(se);
         assert(filename);

@@ -157,10 +157,11 @@ static void t_hooks_run_without_errors(void **state)
         }
 }
 
-static void wait_func(void *done_)
+static void wait_func(struct script_engine *unused, void *done_)
 {
         bool *done = done_;
         *done = true;
+        (void) unused;
 }
 
 static void t_wait_func_gets_called(void **state)
@@ -174,10 +175,11 @@ static void t_wait_func_gets_called(void **state)
         assert_true(wait_done);
 }
 
-static void toggle_flag(void *flag_)
+static void toggle_flag(struct script_engine *unused, void *flag_)
 {
         bool *flag = flag_;
         *flag = !*flag;
+        (void) unused;
 }
 
 static void t_run_cb_gets_invoked(void **state)
