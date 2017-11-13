@@ -116,10 +116,10 @@ clean: clean-tests
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
-superclean: clean clean-luajit clean-ljsyscall
+distclean: clean clean-luajit clean-ljsyscall
 	rm -rf $(staging-dir)
 
-.PHONY: all clean superclean
+.PHONY: all clean distclean
 
 #
 # LuaJIT
