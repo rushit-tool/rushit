@@ -40,6 +40,11 @@ ALL_LDLIBS   = $(OUR_LDLIBS) $(LDLIBS)
 top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 staging-dir := $(top-dir)/staging
 
+# Packaging related - the version number is specified only inside the spec file
+VERSION		:= $(shell awk '/%define rushit_version /{print $$NF}' rushit.spec)
+DIST_ARCHIVES	:= rushit-$(VERSION).tar.gz
+RPMBUILD_TOP	:= ${top-dir}/rpm/
+
 luajit-dir := $(top-dir)/vendor/luajit.org/luajit-2.1
 luajit-inc := $(staging-dir)/include/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
@@ -109,17 +114,29 @@ dummy_test: $(dummy_test-objs)
 
 all: $(binaries)
 
+dist: distclean
+	mkdir rushit-$(VERSION)
+	rsync -Cavz --exclude 'rushit-$(VERSION)' . rushit-$(VERSION)
+	tar -czf $(DIST_ARCHIVES) rushit-$(VERSION)
+	rm -rf rushit-$(VERSION)
+
+rpm: dist
+	mkdir -p ${RPMBUILD_TOP}/SOURCES
+	cp ${DIST_ARCHIVES} ${RPMBUILD_TOP}/SOURCES
+	rpmbuild -D "_topdir ${RPMBUILD_TOP}" -ba rushit.spec
+
 # Clean up just the files that are most likely to change. That is,
 # exclude the dependencies living under vendor/.
 clean: clean-tests
-	rm -f *.[do] $(binaries)
+	rm -f *.[do] $(binaries) $(DIST_ARCHIVES)
+	rm -rf rushit-$(VERSION) rpm/
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
 distclean: clean clean-luajit clean-ljsyscall
 	rm -rf $(staging-dir)
 
-.PHONY: all clean distclean
+.PHONY: all clean distclean dist rpm
 
 #
 # LuaJIT
