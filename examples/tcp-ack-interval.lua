@@ -2,17 +2,22 @@
 -- Measure time between ACKs and display the delay distribution.
 --
 -- TODO:
--- * Extend to handle multiple flows per client. Requires a valid
---   socket descriptor in _close() hoo (currently broken) to
---   differentiate between histograms (one per flow).
--- * Extend to handle multiple clients (threads). Requires either a
---   synchronization mechanism between threads to serialize histogram
---   printing, or a data passing mechanism between worker and main
---   threads.
 -- * Get rid of open coded histogram generation. Introduce helpers.
 --
 
-local hist = {}
+-- Per-thread base-2 logarithmic histogram of interval lengths in
+-- microseconds (us) between consecutive TCP ACKs. Keyed by the upper
+-- bound (exclusive) of the bucket. That is:
+--
+--   hist[2^0] = # of measured intervals between [0, 1) us
+--   hist[2^1] = # of measured intervals between [1, 2) us
+--   ...
+--   hist[2^N] = # of measured intervals between [2^N, 2^N+1) us
+--
+local hist = collect({})
+
+-- Timestamp in microseconds of last TCP ACK. Keyed by socket FD.
+local sock_last_ts = {}
 
 client_socket(
   function (sockfd)
@@ -33,25 +38,33 @@ client_recverr(
     for _, cmsg in msg:cmsgs() do
       if cmsg.cmsg_level == SOL_SOCKET and
          cmsg.cmsg_type == SCM_TIMESTAMPING then
+
+        -- Anciallary message carries a pointer to an scm_timestamping
+        -- structure. We are interested in the fist timestemp in it.
+        --
+        -- struct scm_timestamping {
+        --         struct timespec ts[3];
+        -- };
+        --
         local tss = scm_timestamping(cmsg.cmsg_data)
-        local ts = tss.ts[0]
-        local ts_us = (ts.sec * 1000 * 1000)
-                    + (ts.nsec / 1000)
+        local tv = tss.ts[0]
+        local ts = (tv.sec * 1000 * 1000)
+                 + (tv.nsec / 1000)
 
-        if prev_ts_us then
-          local ival_us = ts_us - prev_ts_us
-          local upper_us = 1
-          local i = 0
+        local last_ts = sock_last_ts[sockfd]
 
-          while ival_us >= upper_us do
-            upper_us = upper_us * 2
-            i = i + 1
+        if last_ts ~= nil then
+          local ival = ts - last_ts
+          local upper = 1 -- 2^0
+
+          while ival >= upper do
+            upper = upper * 2
           end
 
-          hist[i] = (hist[i] or 0) + 1
+          hist[upper] = (hist[upper] or 0) + 1
         end
 
-        prev_ts_us = ts_us
+        sock_last_ts[sockfd] = ts
 
       elseif (cmsg.cmsg_level == SOL_IP and
               cmsg.cmsg_type == IP_RECVERR) or
@@ -65,6 +78,8 @@ client_recverr(
   end
 )
 
+run();
+
 local function bar(val, max, width)
   if max == 0 then return "" end
 
@@ -77,27 +92,46 @@ local function bar(val, max, width)
   return s
 end
 
-client_close(
-  function (sockfd)
-    local max = 0
-    for _, v in ipairs(hist) do
-      if v > max then max = v end
+local function print_hist(h)
+  local max = 0
+
+  for _, v in pairs(h) do
+    if v > max then
+      max = v
     end
-
-    print()
-    print(string.format("%10s .. %-10s: %-10s |%-40s|",
-                        ">=", "< [us]", "Count", "Distribution"))
-    print()
-
-    local lower_us = 0
-    local upper_us = 1
-    for _, v in ipairs(hist) do
-      print(string.format("%10d -> %-10d: %-10d |%-40s|",
-                          lower_us, upper_us, v, bar(v, max, 40)))
-      lower_us = upper_us
-      upper_us = upper_us * 2
-    end
-
-    print()
   end
-)
+
+  print('\n',
+        string.format("%10s .. %-10s: %-10s |%-40s|",
+                      ">=", "< [us]", "Count", "Distribution"),
+        '\n')
+
+  local lower_us = 0
+  local upper_us = 1
+  while lower_us < table.maxn(h) do
+    local count = (h[upper_us] or 0)
+    print(string.format("%10d -> %-10d: %-10d |%-40s|",
+                        lower_us, upper_us, count, bar(count, max, 40)))
+    lower_us = upper_us
+    upper_us = upper_us * 2
+  end
+
+  print()
+end
+
+-- Print per-thread histograms
+for i, h in ipairs(hist) do
+  print("Thread", i)
+  print_hist(h)
+end
+
+-- Print aggregate (sum of all) histogram
+hist_sum = {}
+for _, h in ipairs(hist) do
+  for k, v in pairs(h) do
+    hist_sum[k] = (hist_sum[k] or 0) + v
+  end
+end
+
+print("All threads (summed)")
+print_hist(hist_sum)
