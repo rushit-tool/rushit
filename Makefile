@@ -44,6 +44,7 @@ luajit-dir := $(top-dir)/vendor/luajit.org/luajit-2.1
 luajit-inc := $(staging-dir)/include/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
 luajit-exe := $(staging-dir)/bin/luajit-2.1.0-beta3
+luajit-jit := $(staging-dir)/share/luajit-2.1.0-beta3/jit/
 
 ljsyscall-dir  := $(top-dir)/vendor/github.com/justincormack/ljsyscall
 ljsyscall-srcs := $(shell find $(ljsyscall-dir)/syscall.lua $(ljsyscall-dir)/syscall -name '*.lua')
@@ -76,10 +77,13 @@ binaries := tcp_rr tcp_stream dummy_test
 
 default: all
 
+# avoid dep geneation on clean targets
+ifneq  (,$(findstring $(MAKECMDGOALS),clean))
 -include $(base-objs:.o=.d)
 -include $(tcp_rr-objs:.o=.d)
 -include $(tcp_stream-objs:.o=.d)
 -include $(dummy_test-objs:.o=.d)
+endif
 
 %.o: %.c
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
@@ -91,7 +95,7 @@ default: all
 	@$(CC) -M $(ALL_CPPFLAGS) $< | \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
-$(base-objs): $(luajit-inc)
+$(base-objs): $(luajit-lib)
 $(binaries) $(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
 tcp_rr: $(tcp_rr-objs)
@@ -122,32 +126,37 @@ superclean: clean clean-luajit clean-ljsyscall
 # TODO: Move it to its own Makefile?
 #
 
-build-luajit $(luajit-inc) $(luajit-lib) $(luajit-exe):
+# this implies also luajit-inc and luajit-exe; don't list them explicitly
+# to avoid issues on parallel builds
+$(luajit-lib):
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
+	# module search dir is not configurable, workaround with a symlink
+	ln -s $(luajit-jit) jit
+	rm $(staging-dir)/lib/*.so*
 
 clean-luajit:
-	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) uninstall
 	$(MAKE) -C $(luajit-dir) clean
+	rm -f jit
 
-.PHONY: build-luajit clean-luajit
+.PHONY: clean-luajit
 
 #
 # ljsyscall
 #
 
-$(ljsyscall-objs): $(luajit-exe)
+$(ljsyscall-objs): $(luajit-lib)
 
 $(ljsyscall-dir)/%.o: $(ljsyscall-dir)/%.lua
 	$(luajit-exe) -b -t o -n $(subst /,.,$(subst $(ljsyscall-dir)/,,$(basename $<))) $< $@
 
-build-ljsyscall $(ljsyscall-lib): $(ljsyscall-objs)
+$(ljsyscall-lib): $(ljsyscall-objs)
 	$(AR) cr $@ $^
 
 clean-ljsyscall:
 	$(RM) $(ljsyscall-lib) $(ljsyscall-objs)
 
-.PHONY: build-ljsyscall clean-ljsyscall
+.PHONY: clean-ljsyscall
 
 #
 # Tests
