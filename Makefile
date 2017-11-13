@@ -95,7 +95,7 @@ endif
 	@$(CC) -M $(ALL_CPPFLAGS) $< | \
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
-$(base-objs): $(luajit-inc)
+$(base-objs): $(luajit-lib)
 $(binaries) $(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
 tcp_rr: $(tcp_rr-objs)
@@ -126,7 +126,9 @@ superclean: clean clean-luajit clean-ljsyscall
 # TODO: Move it to its own Makefile?
 #
 
-$(luajit-inc) $(luajit-lib) $(luajit-exe):
+# this implies also luajit-inc and luajit-exe; don't list them explicitly
+# to avoid issues on parallel builds
+$(luajit-lib):
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir)
 	$(MAKE) -C $(luajit-dir) PREFIX=$(staging-dir) install
 	# module search dir is not configurable, workaround with a symlink
@@ -143,7 +145,7 @@ clean-luajit:
 # ljsyscall
 #
 
-$(ljsyscall-objs): $(luajit-exe)
+$(ljsyscall-objs): $(luajit-lib)
 
 $(ljsyscall-dir)/%.o: $(ljsyscall-dir)/%.lua
 	$(luajit-exe) -b -t o -n $(subst /,.,$(subst $(ljsyscall-dir)/,,$(basename $<))) $< $@
