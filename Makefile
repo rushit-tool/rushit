@@ -114,11 +114,9 @@ dummy_test: $(dummy_test-objs)
 
 all: $(binaries)
 
-dist: distclean
-	mkdir rushit-$(VERSION)
-	rsync -Cavz --exclude 'rushit-$(VERSION)' . rushit-$(VERSION)
-	tar -czf $(DIST_ARCHIVES) rushit-$(VERSION)
-	rm -rf rushit-$(VERSION)
+# beware: dist and rpm target work only inside a git tree
+dist:
+	git archive --output=$(DIST_ARCHIVES) --prefix=rushit-$(VERSION)/ HEAD
 
 rpm: dist
 	mkdir -p ${RPMBUILD_TOP}/SOURCES
@@ -129,12 +127,12 @@ rpm: dist
 # exclude the dependencies living under vendor/.
 clean: clean-tests
 	rm -f *.[do] $(binaries) $(DIST_ARCHIVES)
-	rm -rf rushit-$(VERSION) rpm/
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
 distclean: clean clean-luajit clean-ljsyscall
 	rm -rf $(staging-dir)
+	rm -rf rpm/
 
 .PHONY: all clean distclean dist rpm
 
