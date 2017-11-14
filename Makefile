@@ -83,7 +83,9 @@ binaries := tcp_rr tcp_stream dummy_test
 default: all
 
 # avoid dep geneation on clean targets
-ifneq  (,$(findstring $(MAKECMDGOALS),clean))
+# FIXME: on make 4.2 the expression evaluate uncorrectly with a full 'clean'
+# pattern is this a make bug?
+ifneq (,$(findstring $(MAKECMDGOALS),clea))
 -include $(base-objs:.o=.d)
 -include $(tcp_rr-objs:.o=.d)
 -include $(tcp_stream-objs:.o=.d)
