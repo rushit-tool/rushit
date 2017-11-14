@@ -40,6 +40,11 @@ ALL_LDLIBS   = $(OUR_LDLIBS) $(LDLIBS)
 top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 staging-dir := $(top-dir)/staging
 
+# Packaging related - the version number is specified only inside the spec file
+VERSION		:= $(shell awk '/%define rushit_version /{print $$NF}' rushit.spec)
+DIST_ARCHIVES	:= rushit-$(VERSION).tar.gz
+RPMBUILD_TOP	:= ${top-dir}/rpm/
+
 luajit-dir := $(top-dir)/vendor/luajit.org/luajit-2.1
 luajit-inc := $(staging-dir)/include/luajit-2.1
 luajit-lib := $(staging-dir)/lib/libluajit-5.1.a
@@ -78,7 +83,9 @@ binaries := tcp_rr tcp_stream dummy_test
 default: all
 
 # avoid dep geneation on clean targets
-ifneq  (,$(findstring $(MAKECMDGOALS),clean))
+# FIXME: on make 4.2 the expression evaluate uncorrectly with a full 'clean'
+# pattern is this a make bug?
+ifneq (,$(findstring $(MAKECMDGOALS),clea))
 -include $(base-objs:.o=.d)
 -include $(tcp_rr-objs:.o=.d)
 -include $(tcp_stream-objs:.o=.d)
@@ -109,17 +116,27 @@ dummy_test: $(dummy_test-objs)
 
 all: $(binaries)
 
+# beware: dist and rpm target work only inside a git tree
+dist:
+	git archive --output=$(DIST_ARCHIVES) --prefix=rushit-$(VERSION)/ HEAD
+
+rpm: dist
+	mkdir -p ${RPMBUILD_TOP}/SOURCES
+	cp ${DIST_ARCHIVES} ${RPMBUILD_TOP}/SOURCES
+	rpmbuild -D "_topdir ${RPMBUILD_TOP}" -ba rushit.spec
+
 # Clean up just the files that are most likely to change. That is,
 # exclude the dependencies living under vendor/.
 clean: clean-tests
-	rm -f *.[do] $(binaries)
+	rm -f *.[do] $(binaries) $(DIST_ARCHIVES)
 
 # Clean up all files, even those that you usually don't want to
 # rebuild. That is, include the dependencies living under vendor/.
-superclean: clean clean-luajit clean-ljsyscall
+distclean: clean clean-luajit clean-ljsyscall
 	rm -rf $(staging-dir)
+	rm -rf rpm/
 
-.PHONY: all clean superclean
+.PHONY: all clean distclean dist rpm
 
 #
 # LuaJIT
