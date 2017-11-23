@@ -77,8 +77,9 @@ base-objs := \
 tcp_rr-objs := tcp_rr_main.o tcp_rr.o
 tcp_stream-objs := tcp_stream_main.o tcp_stream.o
 dummy_test-objs := dummy_test_main.o dummy_test.o
+udp_stream-objs := udp_stream_main.o udp_stream.o
 
-binaries := tcp_rr tcp_stream dummy_test
+binaries := tcp_rr tcp_stream dummy_test udp_stream
 
 default: all
 
@@ -112,6 +113,9 @@ tcp_stream: $(tcp_stream-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 dummy_test: $(dummy_test-objs)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
+
+udp_stream: $(udp_stream-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 all: $(binaries)
