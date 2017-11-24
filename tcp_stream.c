@@ -147,13 +147,12 @@ write_again:
         }
 }
 
-static int client_connect(int flow_id, int epfd, struct thread *t)
+static int client_connect(struct thread *t)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
         struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
-        struct flow *flow;
         int fd;
 
         fd = do_socket_open(ss, ai);
@@ -171,10 +170,6 @@ static int client_connect(int flow_id, int epfd, struct thread *t)
         if (do_connect(fd, ai->ai_addr, ai->ai_addrlen))
                 PLOG_FATAL(cb, "do_connect");
 
-        flow = addflow(t->index, epfd, fd, flow_id, epoll_events(opts), opts,
-                       cb);
-        flow->itv = interval_create(opts->interval, t);
-
         return fd;
 }
 
@@ -188,8 +183,8 @@ static void run_client(struct thread *t)
         struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
         struct epoll_event *events;
-        struct flow *stop_fl;
-        int epfd, i;
+        struct flow *flow, *stop_fl;
+        int epfd, fd, i;
         char *buf;
         CLEANUP(free) int *client_fds = NULL;
 
@@ -202,8 +197,16 @@ static void run_client(struct thread *t)
         if (epfd == -1)
                 PLOG_FATAL(cb, "epoll_create1");
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
-        for (i = 0; i < flows_in_this_thread; i++)
-                client_fds[i] = client_connect(i, epfd, t);
+        for (i = 0; i < flows_in_this_thread; i++) {
+                fd = client_connect(t);
+
+                flow = addflow(t->index, epfd, fd, i, epoll_events(opts), opts, cb);
+                flow->itv = interval_create(opts->interval, t);
+
+                client_fds[i] = fd;
+                /* flow will be deleted by process_events() */
+        }
+
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
         buf = buf_alloc(opts);
         if (!buf)
