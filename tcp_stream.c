@@ -30,6 +30,7 @@
 #include "logging.h"
 #include "sample.h"
 #include "thread.h"
+#include "workload.h"
 
 static inline uint32_t epoll_events(struct options *opts)
 {
@@ -205,11 +206,9 @@ static void run_client(struct thread *t)
         for (i = 0; i < flows_in_this_thread; i++)
                 client_fds[i] = client_connect(i, epfd, t);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
-        buf = malloc(opts->buffer_size);
+        buf = buf_alloc(opts);
         if (!buf)
-                PLOG_FATAL(cb, "malloc");
-        if (opts->enable_write)
-                fill_random(buf, opts->buffer_size);
+                PLOG_FATAL(cb, "buf_alloc");
         pthread_barrier_wait(t->ready);
         while (!t->stop) {
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
@@ -263,11 +262,9 @@ static void run_server(struct thread *t)
         listen_fl = addflow_lite(epfd, fd_listen, EPOLLIN, cb);
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
-        buf = malloc(opts->buffer_size);
+        buf = buf_alloc(opts);
         if (!buf)
-                PLOG_FATAL(cb, "malloc");
-        if (opts->enable_write)
-                fill_random(buf, opts->buffer_size);
+                PLOG_FATAL(cb, "buf_alloc");
         pthread_barrier_wait(t->ready);
         while (!t->stop) {
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
