@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
+#ifndef NEPER_SERIALIZE_H
+#define NEPER_SERIALIZE_H
+
 /*
  * Tools for transferring Lua values from one Lua state to another.
  */
-
-#ifndef NEPER_SERIALIZE_H
-#define NEPER_SERIALIZE_H
 
 #include <stdbool.h>
 
