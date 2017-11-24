@@ -72,7 +72,8 @@ base-objs := \
 	script_prelude.o \
 	serialize.o \
 	thread.o \
-	version.o
+	version.o \
+	workload.o
 
 tcp_rr-objs := tcp_rr_main.o tcp_rr.o
 tcp_stream-objs := tcp_stream_main.o tcp_stream.o
