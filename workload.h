@@ -21,12 +21,16 @@
  * Logic shared by all workloads.
  */
 
+#include <stdint.h>
 
 /* Allocate and initialize a buffer big enough for sending/receiving. */
 void *buf_alloc(struct options *opts);
 
 /* Open, configure according to options, and connect a client socket. */
 int client_connect(struct thread *t);
+
+/* Convert run-time options to a set of epoll events */
+uint32_t epoll_events(struct options *opts);
 
 
 #endif

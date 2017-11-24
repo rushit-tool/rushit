@@ -32,18 +32,6 @@
 #include "thread.h"
 #include "workload.h"
 
-static inline uint32_t epoll_events(struct options *opts)
-{
-        uint32_t events = 0;
-        if (opts->enable_write)
-                events |= EPOLLOUT;
-        if (opts->enable_read)
-                events |= EPOLLIN;
-        if (opts->edge_trigger)
-                events |= EPOLLET;
-        return events;
-}
-
 /**
  * The function expects @fd_listen is in a "ready" state in the @epfd
  * epoll set, and directly calls accept() on @fd_listen. The readiness

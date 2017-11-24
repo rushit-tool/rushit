@@ -181,7 +181,7 @@ static void run_client(struct thread *t)
         for (i = 0; i < flows_in_this_thread; i++) {
                 fd = client_connect(t);
 
-                flow = addflow(t->index, epfd, fd, i, EPOLLOUT, opts, cb);
+                flow = addflow(t->index, epfd, fd, i, epoll_events(opts), opts, cb);
                 flow->bytes_to_write = opts->request_size;
                 flow->itv = interval_create(opts->interval, t);
 

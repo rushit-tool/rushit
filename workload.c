@@ -67,3 +67,15 @@ int client_connect(struct thread *t)
 
         return fd;
 }
+
+uint32_t epoll_events(struct options *opts)
+{
+        uint32_t events = 0;
+        if (opts->enable_write)
+                events |= EPOLLOUT;
+        if (opts->enable_read)
+                events |= EPOLLIN;
+        if (opts->edge_trigger)
+                events |= EPOLLET;
+        return events;
+}
