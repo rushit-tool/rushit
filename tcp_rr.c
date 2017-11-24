@@ -213,6 +213,8 @@ static void run_client(struct thread *t)
                 client_fds[i] = client_connect(i, epfd, t);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
         buf = buf_alloc(opts);
+        if (!buf)
+                PLOG_FATAL(cb, "buf_alloc");
         pthread_barrier_wait(t->ready);
         while (!t->stop) {
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
@@ -350,6 +352,8 @@ static void run_server(struct thread *t)
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
         buf = buf_alloc(opts);
+        if (!buf)
+                PLOG_FATAL(cb, "buf_alloc");
         pthread_barrier_wait(t->ready);
         while (!t->stop) {
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;

@@ -27,7 +27,8 @@ void *buf_alloc(struct options *opts)
 
         if (alloc_size < opts->response_size)
                 alloc_size = opts->response_size;
-        if (alloc_size > opts->buffer_size)
+        /* request/response sizes are zero for stream workloads */
+        if (!alloc_size || alloc_size > opts->buffer_size)
                 alloc_size = opts->buffer_size;
 
         buf = calloc(alloc_size, sizeof(char));
