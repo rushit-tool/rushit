@@ -201,7 +201,6 @@ static void run_client(struct thread *t)
         epfd = epoll_create1(0);
         if (epfd == -1)
                 PLOG_FATAL(cb, "epoll_create1");
-        LOG_INFO(cb, "t->stop_efd=%d", t->stop_efd);
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         for (i = 0; i < flows_in_this_thread; i++)
                 client_fds[i] = client_connect(i, epfd, t);
