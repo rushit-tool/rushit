@@ -122,32 +122,6 @@ static void client_events(struct thread *t, int epfd,
         }
 }
 
-static int client_connect(struct thread *t)
-{
-        struct script_slave *ss = t->script_slave;
-        struct options *opts = t->opts;
-        struct callbacks *cb = t->cb;
-        struct addrinfo *ai = t->ai;
-        int fd;
-
-        fd = do_socket_open(ss, ai);
-        if (fd == -1) {
-                PLOG_FATAL(cb, "socket");
-                return fd;
-        }
-
-        if (opts->min_rto)
-                set_min_rto(fd, opts->min_rto, cb);
-        if (opts->debug)
-                set_debug(fd, 1, cb);
-        if (opts->local_host)
-                set_local_host(fd, opts, cb);
-        if (do_connect(fd, ai->ai_addr, ai->ai_addrlen))
-                PLOG_FATAL(cb, "do_connect");
-
-        return fd;
-}
-
 /**
  * The function expects @fd_listen is in a "ready" state in the @epfd
  * epoll set, and directly calls accept() on @fd_listen. The readiness
