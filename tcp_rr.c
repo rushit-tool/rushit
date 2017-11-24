@@ -32,6 +32,7 @@
 #include "percentiles.h"
 #include "sample.h"
 #include "thread.h"
+#include "workload.h"
 
 static inline void track_write_time(struct options *opts, struct flow *flow)
 {
@@ -119,26 +120,6 @@ static void client_events(struct thread *t, int epfd,
                         flow->bytes_to_write = opts->request_size;
                 }
         }
-}
-
-static void *buf_alloc(struct options *opts)
-{
-        size_t alloc_size = opts->request_size;
-        void *buf;
-
-        if (alloc_size < opts->response_size)
-                alloc_size = opts->response_size;
-        if (alloc_size > opts->buffer_size)
-                alloc_size = opts->buffer_size;
-
-        buf = calloc(alloc_size, sizeof(char));
-        if (!buf)
-                return NULL;
-
-        if (opts->enable_write)
-                fill_random(buf, alloc_size);
-
-        return buf;
 }
 
 static int client_connect(int i, int epfd, struct thread *t)

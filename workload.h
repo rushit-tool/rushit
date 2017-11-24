@@ -21,4 +21,9 @@
  * Logic shared by all workloads.
  */
 
+
+/* Allocate and initialize a buffer big enough for sending/receiving. */
+void *buf_alloc(struct options *opts);
+
+
 #endif

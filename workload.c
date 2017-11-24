@@ -13,3 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#include <stdlib.h>
+
+#include "common.h"
+#include "lib.h"
+
+
+void *buf_alloc(struct options *opts)
+{
+        size_t alloc_size = opts->request_size;
+        void *buf;
+
+        if (alloc_size < opts->response_size)
+                alloc_size = opts->response_size;
+        if (alloc_size > opts->buffer_size)
+                alloc_size = opts->buffer_size;
+
+        buf = calloc(alloc_size, sizeof(char));
+        if (!buf)
+                return NULL;
+
+        if (opts->enable_write)
+                fill_random(buf, alloc_size);
+
+        return buf;
+}
