@@ -227,19 +227,6 @@ void fill_random(char *buf, int size)
         close(fd);
 }
 
-int do_socket_close(struct script_slave *ss, int sockfd, struct addrinfo *ai)
-{
-        int r;
-
-        r = script_slave_close_hook(ss, sockfd, ai);
-        if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
-                errno = -r;
-                return -1;
-        }
-
-        return do_close(sockfd);
-}
-
 int do_close(int fd)
 {
         for (;;) {

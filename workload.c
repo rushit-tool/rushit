@@ -104,6 +104,19 @@ int do_socket_open(struct script_slave *ss, struct addrinfo *ai)
         return fd;
 }
 
+int do_socket_close(struct script_slave *ss, int sockfd, struct addrinfo *ai)
+{
+        int r;
+
+        r = script_slave_close_hook(ss, sockfd, ai);
+        if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
+                errno = -r;
+                return -1;
+        }
+
+        return do_close(sockfd);
+}
+
 void run_client(struct thread *t, process_events_t process_events)
 {
         struct script_slave *ss = t->script_slave;
