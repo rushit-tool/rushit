@@ -44,5 +44,8 @@ uint32_t epoll_events(struct options *opts);
 /* Main routine for client threads, both stream & request/response workloads */
 void run_client(struct thread *t, process_events_t process_events);
 
+/* Main routine for server threads, both stream & request/response workloads */
+void run_server(struct thread *t, process_events_t process_events);
+
 
 #endif

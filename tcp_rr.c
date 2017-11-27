@@ -240,60 +240,6 @@ static void server_events(struct thread *t, int epfd,
         }
 }
 
-static void run_server(struct thread *t)
-{
-        struct script_slave *ss = t->script_slave;
-        struct options *opts = t->opts;
-        struct callbacks *cb = t->cb;
-        struct addrinfo *ai = t->ai;
-        struct epoll_event *events;
-        struct flow *listen_fl;
-        struct flow *stop_fl;
-        int fd_listen, epfd;
-        char *buf;
-
-        fd_listen = do_socket_open(ss, ai);
-        if (fd_listen == -1)
-                PLOG_FATAL(cb, "socket");
-        set_reuseport(fd_listen, cb);
-        set_reuseaddr(fd_listen, 1, cb);
-        if (bind(fd_listen, ai->ai_addr, ai->ai_addrlen))
-                PLOG_FATAL(cb, "bind");
-        if (opts->min_rto)
-                set_min_rto(fd_listen, opts->min_rto, cb);
-        if (listen(fd_listen, opts->listen_backlog))
-                PLOG_FATAL(cb, "listen");
-        epfd = epoll_create1(0);
-        if (epfd == -1)
-                PLOG_FATAL(cb, "epoll_create1");
-        listen_fl = addflow_lite(epfd, fd_listen, EPOLLIN, cb);
-        stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
-        events = calloc(opts->maxevents, sizeof(struct epoll_event));
-        buf = buf_alloc(opts);
-        if (!buf)
-                PLOG_FATAL(cb, "buf_alloc");
-        pthread_barrier_wait(t->ready);
-        while (!t->stop) {
-                int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds = epoll_wait(epfd, events, opts->maxevents, ms);
-                if (nfds == -1) {
-                        if (errno == EINTR)
-                                continue;
-                        PLOG_FATAL(cb, "epoll_wait");
-                }
-                server_events(t, epfd, events, nfds, fd_listen, buf);
-        }
-
-        if (do_socket_close(ss, fd_listen, ai) < 0)
-                PLOG_FATAL(cb, "close");
-
-        free(buf);
-        free(events);
-        free(stop_fl);
-        free(listen_fl);
-        do_close(epfd);
-}
-
 static void *thread_start(void *arg)
 {
         struct thread *t = arg;
@@ -301,7 +247,7 @@ static void *thread_start(void *arg)
         if (t->opts->client)
                 run_client(t, client_events);
         else
-                run_server(t);
+                run_server(t, server_events);
         return NULL;
 }
 
