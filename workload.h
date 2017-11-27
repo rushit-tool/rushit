@@ -41,8 +41,8 @@ int client_connect(struct thread *t);
 /* Convert run-time options to a set of epoll events */
 uint32_t epoll_events(struct options *opts);
 
-/* Main client thread routine for stream (bulk data xfer) workloads */
-void run_client_stream(struct thread *t, process_events_t process_events);
+/* Main routine for client threads, both stream & request/response workloads */
+void run_client(struct thread *t, process_events_t process_events);
 
 
 #endif

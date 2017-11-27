@@ -194,7 +194,7 @@ static void *worker_thread(void *arg)
         struct thread *t = arg;
         reset_port(t->ai, atoi(t->opts->port), t->cb);
         if (t->opts->client)
-                run_client_stream(t, process_events);
+                run_client(t, process_events);
         else
                 run_server(t);
         return NULL;

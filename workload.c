@@ -83,7 +83,7 @@ uint32_t epoll_events(struct options *opts)
         return events;
 }
 
-void run_client_stream(struct thread *t, process_events_t process_events)
+void run_client(struct thread *t, process_events_t process_events)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
@@ -111,6 +111,7 @@ void run_client_stream(struct thread *t, process_events_t process_events)
                 fd = client_connect(t);
 
                 flow = addflow(t->index, epfd, fd, i, epoll_events(opts), opts, cb);
+                flow->bytes_to_write = opts->request_size;
                 flow->itv = interval_create(opts->interval, t);
 
                 client_fds[i] = fd;
