@@ -11,20 +11,20 @@
 -- dummy_test workload.
 --
 
-io.stderr:write('1\n')
+print('1')
 
-client_socket(  function () io.stderr:write('2\n') end )
-client_sendmsg( function () io.stderr:write('3\n'); return 0; end )
-client_recvmsg( function () io.stderr:write('4\n'); return 0; end )
-client_recverr( function () io.stderr:write('5\n'); return 0; end )
-client_close(   function () io.stderr:write('6\n') end )
+client_socket(  function () print('2') end )
+client_sendmsg( function () print('3'); return 0; end )
+client_recvmsg( function () print('4'); return 0; end )
+client_recverr( function () print('5'); return 0; end )
+client_close(   function () print('6') end )
 
-server_socket(  function () io.stderr:write('2\n') end )
-server_recvmsg( function () io.stderr:write('3\n'); return 0; end )
-server_sendmsg( function () io.stderr:write('4\n'); return 0; end )
-server_recverr( function () io.stderr:write('5\n'); return 0; end )
-server_close(   function () io.stderr:write('6\n') end )
+server_socket(  function () print('2') end )
+server_recvmsg( function () print('3'); return 0; end )
+server_sendmsg( function () print('4'); return 0; end )
+server_recverr( function () print('5'); return 0; end )
+server_close(   function () print('6') end )
 
 run()
 
-io.stderr:write('7\n')
+print('7')
