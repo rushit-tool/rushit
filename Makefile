@@ -105,7 +105,7 @@ endif
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
 $(base-objs): $(luajit-lib)
-$(binaries) $(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
+$(binaries) $(tests-unit): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
 tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
@@ -190,21 +190,21 @@ unit-test-dir  := $(test-dir)/unit
 unit-test-libs := $(shell pkg-config --libs cmocka)
 
 t_script-objs := $(unit-test-dir)/t_script.o
-test-binaries := $(unit-test-dir)/t_script
+tests-unit := $(unit-test-dir)/t_script
 
 -include $(t_script-objs:.o=.d)
 
 $(unit-test-dir)/t_script: $(t_script-objs)
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $^ $(ALL_LDFLAGS) $(ALL_LDLIBS) $(unit-test-libs)
 
-$(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
+$(tests-unit): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
-build-tests: $(test-binaries)
+build-tests: $(tests-unit)
 
 clean-tests:
-	$(RM) -f $(unit-test-dir)/*.[do] $(test-binaries)
+	$(RM) -f $(unit-test-dir)/*.[do] $(tests-unit)
 
-check-unit: $(test-binaries)
+check-unit: $(tests-unit)
 	$(unit-test-dir)/t_script
 
 check-func: dummy_test tcp_stream tcp_rr
