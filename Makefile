@@ -193,6 +193,7 @@ unit-test-libs := $(shell pkg-config --libs cmocka)
 
 t_script-objs := $(unit-test-dir)/t_script.o
 tests-unit := $(unit-test-dir)/t_script
+tests-func := $(wildcard $(func-test-dir)/[0-9][0-9][0-9][0-9])
 
 -include $(t_script-objs:.o=.d)
 
@@ -200,6 +201,8 @@ $(unit-test-dir)/t_script: $(t_script-objs)
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $^ $(ALL_LDFLAGS) $(ALL_LDLIBS) $(unit-test-libs)
 
 $(tests-unit): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
+
+$(tests-func): dummy_test tcp_stream tcp_rr
 
 build-tests: $(tests-unit)
 
@@ -212,15 +215,11 @@ check-unit: $(tests-unit)
 	else for t in $(sort $(tests-unit)); do $$t; done; \
 	fi
 
-check-func: dummy_test tcp_stream tcp_rr
-	$(func-test-dir)/0001
-	$(func-test-dir)/0002
-	$(func-test-dir)/0003
-	$(func-test-dir)/0004
-	$(func-test-dir)/0005
-	$(func-test-dir)/0006
-	$(func-test-dir)/0007
-	$(func-test-dir)/0008
+check-func: $(tests-func)
+	if [ -x "$$(type -P avocado)" ]; \
+	then avocado run $(sort $(tests-func)); \
+	else for t in $(sort $(tests-func)); do $$t; done; \
+	fi
 
 check: check-unit check-func
 
