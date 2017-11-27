@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <assert.h>
 #include <stdlib.h>
 
 #include "common.h"
@@ -81,6 +82,26 @@ uint32_t epoll_events(struct options *opts)
         if (opts->edge_trigger)
                 events |= EPOLLET;
         return events;
+}
+
+int do_socket_open(struct script_slave *ss, struct addrinfo *ai)
+{
+        int fd, r;
+
+        assert(ai);
+
+        fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (fd == -1)
+                return -1;
+
+        r = script_slave_socket_hook(ss, fd, ai);
+        if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
+                do_close(fd);
+                errno = -r;
+                return -1;
+        }
+
+        return fd;
 }
 
 void run_client(struct thread *t, process_events_t process_events)

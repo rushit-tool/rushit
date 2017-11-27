@@ -227,26 +227,6 @@ void fill_random(char *buf, int size)
         close(fd);
 }
 
-int do_socket_open(struct script_slave *ss, struct addrinfo *ai)
-{
-        int fd, r;
-
-        assert(ai);
-
-        fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
-        if (fd == -1)
-                return -1;
-
-        r = script_slave_socket_hook(ss, fd, ai);
-        if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
-                do_close(fd);
-                errno = -r;
-                return -1;
-        }
-
-        return fd;
-}
-
 int do_socket_close(struct script_slave *ss, int sockfd, struct addrinfo *ai)
 {
         int r;

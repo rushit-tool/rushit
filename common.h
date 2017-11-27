@@ -107,7 +107,6 @@ void set_local_host(int fd, struct options *opt, struct callbacks *cb);
 int procfile_int(const char *path, struct callbacks *cb);
 
 void fill_random(char *buf, int size);
-int do_socket_open(struct script_slave *ss, struct addrinfo *ai);
 int do_socket_close(struct script_slave *ss, int sockfd, struct addrinfo *ai);
 int do_close(int fd);
 int do_connect(int s, const struct sockaddr *addr, socklen_t addr_len);

@@ -47,5 +47,8 @@ void run_client(struct thread *t, process_events_t process_events);
 /* Main routine for server threads, both stream & request/response workloads */
 void run_server(struct thread *t, process_events_t process_events);
 
+/* XXX: Internal API. Still used by dummy_test. */
+int do_socket_open(struct script_slave *ss, struct addrinfo *ai);
+
 
 #endif
