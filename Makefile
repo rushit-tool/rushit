@@ -207,7 +207,10 @@ clean-tests:
 	$(RM) -f $(unit-test-dir)/*.[do] $(tests-unit)
 
 check-unit: $(tests-unit)
-	$(unit-test-dir)/t_script
+	if [ -x "$$(type -P avocado)" ]; \
+	then avocado run $(sort $(tests-unit)); \
+	else for t in $(sort $(tests-unit)); do $$t; done; \
+	fi
 
 check-func: dummy_test tcp_stream tcp_rr
 	$(func-test-dir)/0001
