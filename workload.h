@@ -23,6 +23,15 @@
 
 #include <stdint.h>
 
+
+struct epoll_event;
+
+/* Callback invoked from main thread loop for processing socket events. */
+typedef void (*process_events_t)(struct thread *t, int epoll_fd,
+                                 struct epoll_event *events, int nfds,
+                                 int listen_fd, char *buf);
+
+
 /* Allocate and initialize a buffer big enough for sending/receiving. */
 void *buf_alloc(struct options *opts);
 
@@ -31,6 +40,9 @@ int client_connect(struct thread *t);
 
 /* Convert run-time options to a set of epoll events */
 uint32_t epoll_events(struct options *opts);
+
+/* Main client thread routine for stream (bulk data xfer) workloads */
+void run_client_stream(struct thread *t, process_events_t process_events);
 
 
 #endif
