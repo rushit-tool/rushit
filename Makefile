@@ -16,6 +16,8 @@
 #
 # Makefile.
 
+SHELL = /bin/bash
+
 # Recommended flags (may be overridden by the user from environment/command line)
 CPPFLAGS =
 CFLAGS   = -std=c99 -Wall -Werror -O3 -g
