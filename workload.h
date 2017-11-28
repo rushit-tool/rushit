@@ -48,9 +48,6 @@ typedef void (*process_events_t)(struct thread *t, int epoll_fd,
                                  int listen_fd, char *buf);
 
 
-/* Open, configure according to options, and connect a client socket. */
-int client_connect(struct thread *t, const struct socket_ops *ops);
-
 /* Convert run-time options to a set of epoll events */
 uint32_t epoll_events(struct options *opts);
 

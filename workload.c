@@ -92,7 +92,8 @@ static void *buf_alloc(struct options *opts)
         return buf;
 }
 
-int client_connect(struct thread *t, const struct socket_ops *ops)
+/* Open, configure according to options, and connect a client socket. */
+static int client_connect(struct thread *t, const struct socket_ops *ops)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
