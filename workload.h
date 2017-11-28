@@ -48,9 +48,6 @@ typedef void (*process_events_t)(struct thread *t, int epoll_fd,
                                  int listen_fd, char *buf);
 
 
-/* Allocate and initialize a buffer big enough for sending/receiving. */
-void *buf_alloc(struct options *opts);
-
 /* Open, configure according to options, and connect a client socket. */
 int client_connect(struct thread *t, const struct socket_ops *ops);
 

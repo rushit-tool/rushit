@@ -70,7 +70,8 @@ const struct socket_ops tcp_socket_ops = {
         .close = do_close,
 };
 
-void *buf_alloc(struct options *opts)
+/* Allocate and initialize a buffer big enough for sending/receiving. */
+static void *buf_alloc(struct options *opts)
 {
         size_t alloc_size = opts->request_size;
         void *buf;
