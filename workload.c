@@ -52,6 +52,15 @@ static int socket_close(const struct socket_ops *ops, int sockfd)
         return ops->close ? ops->close(sockfd) : 0;
 }
 
+static int do_epoll_wait(const struct socket_ops *ops, int epfd,
+                         struct epoll_event *events, int maxevents, int timeout)
+{
+        if (ops->epoll_wait)
+                return ops->epoll_wait(epfd, events, maxevents, timeout);
+        else
+                return epoll_wait(epfd, events, maxevents, timeout);
+}
+
 const struct socket_ops tcp_socket_ops = {
         .open = tcp_socket_open,
         .bind = bind,
@@ -200,7 +209,7 @@ void run_client(struct thread *t, const struct socket_ops *ops,
         pthread_barrier_wait(t->ready);
         while (!t->stop) {
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds = epoll_wait(epfd, events, opts->maxevents, ms);
+                int nfds = do_epoll_wait(ops, epfd, events, opts->maxevents, ms);
                 if (nfds == -1) {
                         if (errno == EINTR)
                                 continue;
@@ -259,7 +268,7 @@ void run_server(struct thread *t, const struct socket_ops *ops,
         pthread_barrier_wait(t->ready);
         while (!t->stop) {
                 int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds = epoll_wait(epfd, events, opts->maxevents, ms);
+                int nfds = do_epoll_wait(ops, epfd, events, opts->maxevents, ms);
                 if (nfds == -1) {
                         if (errno == EINTR)
                                 continue;

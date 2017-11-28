@@ -34,6 +34,9 @@ struct socket_ops {
         int (*accept)(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
         int (*connect)(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
         int (*close)(int sockfd);
+
+        /* For dummy/fake workloads only. Defaults to epoll_wait(2) if not set. */
+        int (*epoll_wait)(int epfd, struct epoll_event *events, int maxevents, int timeout);
 };
 
 /* Operations for TCP sockets. */

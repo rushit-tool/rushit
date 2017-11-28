@@ -85,13 +85,34 @@ static int fake_epoll_wait(int epfd, struct epoll_event *events,
         return epoll_wait(epfd, events, maxevents, timeout);
 }
 
+static int fake_socket_open(const struct addrinfo *hints)
+{
+        int sockfds[2];
+        int err;
+
+        err = socketpair(AF_UNIX, hints->ai_socktype, 0, sockfds);
+        if (err)
+                return err;
+
+        /* XXX: Leak sockfd[1] */
+        return sockfds[0];
+}
+
+struct socket_ops fake_socket_ops = {
+        .open = fake_socket_open,
+        .epoll_wait = fake_epoll_wait,
+};
+
 static void client_events(struct thread *t, int epfd,
-                          struct epoll_event *events, int nfds, char *buf)
+                          struct epoll_event *events, int nfds,
+                          int listen_fd, char *buf)
 {
         struct callbacks *cb = t->cb;
         struct flow *flow;
         ssize_t num_bytes;
         int i;
+
+        UNUSED(listen_fd);
 
         for (i = 0; i < nfds; i++) {
                 flow = events[i].data.ptr;
@@ -135,73 +156,6 @@ static void client_events(struct thread *t, int epfd,
                         }
                 }
         }
-}
-
-static void fake_client_connect(struct thread *t, const struct socket_ops *ops)
-{
-        struct script_slave *ss = t->script_slave;
-        struct callbacks *cb = t->cb;
-        struct addrinfo *ai = t->ai;
-        int fd;
-
-        fd = do_socket_open(ops, ss, ai);
-        if (fd == -1)
-                PLOG_FATAL(cb, "socket");
-        /* STUB: Set socket options */
-        /* STUB: Connect socket */
-        /* STUB: Add flow */
-}
-
-static void run_dummy_client(struct thread *t, const struct socket_ops *ops)
-{
-        struct script_slave *ss = t->script_slave;
-        struct options *opts = t->opts;
-        const int flows_in_this_thread = flows_in_thread(opts->num_flows,
-                                                         opts->num_threads,
-                                                         t->index);
-        struct callbacks *cb = t->cb;
-        struct addrinfo *ai = t->ai;
-        struct epoll_event *events;
-        struct flow *stop_fl;
-        char *buf = NULL;
-        int epfd, i;
-
-        /* Setup I/O multiplexer */
-        epfd = epoll_create1(0);
-        if (epfd == -1)
-                PLOG_FATAL(cb, "epoll_create1");
-        stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
-        for (i = 0; i < flows_in_this_thread; i++)
-                fake_client_connect(t, ops);
-        events = calloc(opts->maxevents, sizeof(struct epoll_event));
-
-        /* STUB: Allocate buffers */
-
-        /* Sync threads */
-        pthread_barrier_wait(t->ready);
-
-        /* Main loop */
-        while (!t->stop) {
-                int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds = fake_epoll_wait(epfd, events, opts->maxevents, ms);
-                if (nfds == -1) {
-                        if (errno == EINTR)
-                                continue;
-                        PLOG_FATAL(cb, "epoll_wait");
-                }
-                client_events(t, epfd, events, nfds, buf);
-        }
-
-        /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
-        for (i = 0; i < flows_in_this_thread; i++) {
-                if (do_socket_close(ops, ss, -1, ai) < 0)
-                        /* PLOG_FATAL(cb, "close"); */
-                        /* XXX: ignore errors */ ;
-        }
-
-        free(events);
-        free(stop_fl);
-        do_close(epfd);
 }
 
 static void server_events(struct thread *t, int epfd,
@@ -257,62 +211,6 @@ static void server_events(struct thread *t, int epfd,
         }
 }
 
-static void run_dummy_server(struct thread *t, const struct socket_ops *ops)
-{
-        struct script_slave *ss = t->script_slave;
-        struct options *opts = t->opts;
-        struct callbacks *cb = t->cb;
-        struct addrinfo *ai = t->ai;
-        struct epoll_event *events;
-        struct flow *stop_fl;
-        int fd_listen = -1, epfd;
-        char *buf = NULL;
-
-        assert(opts->maxevents > 0);
-
-        fd_listen = do_socket_open(ops, ss, ai);
-        if (fd_listen == -1)
-                PLOG_FATAL(cb, "socket");
-        /* STUB: Set socket options */
-        /* STUB: Bind & listen */
-
-        /* Setup I/O multiplexer */
-        epfd = epoll_create1(0);
-        if (epfd == -1)
-                PLOG_FATAL(cb, "epoll_create1");
-        stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
-        events = calloc(opts->maxevents, sizeof(struct epoll_event));
-
-        /* STUB: Allocate buffers */
-
-        /* Sync threads */
-        pthread_barrier_wait(t->ready);
-
-        /* Main loop */
-        while (!t->stop) {
-                /* Poll for events */
-                int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds =  fake_epoll_wait(epfd, events, opts->maxevents, ms);
-                if (nfds == -1) {
-                        if (errno == EINTR)
-                                continue;
-                        PLOG_FATAL(cb, "epoll_wait");
-                }
-                /* Process events */
-                server_events(t, epfd, events, nfds, fd_listen, buf);
-        }
-
-        /* XXX: Sync threads? */
-        if (do_socket_close(ops, ss, fd_listen, ai) < 0)
-                PLOG_FATAL(cb, "close");
-
-        /* Free resources */
-        /* STUB: Free buffers */
-        free(events);
-        free(stop_fl);
-        do_close(epfd);
-}
-
 static void *worker_thread(void *arg)
 {
         struct thread *t = arg;
@@ -323,9 +221,9 @@ static void *worker_thread(void *arg)
         reset_port(t->ai, atoi(opts->port), t->cb);
 
         if (opts->client)
-                run_dummy_client(t, &tcp_socket_ops);
+                run_client(t, &fake_socket_ops, client_events);
         else
-                run_dummy_server(t, &tcp_socket_ops);
+                run_server(t, &fake_socket_ops, server_events);
 
         return NULL;
 }
