@@ -61,6 +61,27 @@ static int do_epoll_wait(const struct socket_ops *ops, int epfd,
                 return epoll_wait(epfd, events, maxevents, timeout);
 }
 
+static int do_socket_open(const struct socket_ops *ops, struct script_slave *ss,
+                          struct addrinfo *ai)
+{
+        int fd, r;
+
+        assert(ai);
+
+        fd = ops->open(ai);
+        if (fd == -1)
+                return -1;
+
+        r = script_slave_socket_hook(ss, fd, ai);
+        if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
+                socket_close(ops, fd);
+                errno = -r;
+                return -1;
+        }
+
+        return fd;
+}
+
 const struct socket_ops tcp_socket_ops = {
         .open = tcp_socket_open,
         .bind = bind,
@@ -129,27 +150,6 @@ uint32_t epoll_events(struct options *opts)
         if (opts->edge_trigger)
                 events |= EPOLLET;
         return events;
-}
-
-int do_socket_open(const struct socket_ops *ops, struct script_slave *ss,
-                   struct addrinfo *ai)
-{
-        int fd, r;
-
-        assert(ai);
-
-        fd = ops->open(ai);
-        if (fd == -1)
-                return -1;
-
-        r = script_slave_socket_hook(ss, fd, ai);
-        if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
-                socket_close(ops, fd);
-                errno = -r;
-                return -1;
-        }
-
-        return fd;
 }
 
 int do_socket_close(const struct socket_ops *ops, struct script_slave *ss,
