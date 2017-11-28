@@ -59,9 +59,5 @@ void run_client(struct thread *t, const struct socket_ops *ops,
 void run_server(struct thread *t, const struct socket_ops *ops,
                 process_events_t process_events);
 
-/* XXX: Internal API. Still used by dummy_test. */
-int do_socket_close(const struct socket_ops *ops, struct script_slave *ss,
-                    int sockfd, struct addrinfo *ai);
-
 
 #endif

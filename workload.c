@@ -82,6 +82,20 @@ static int do_socket_open(const struct socket_ops *ops, struct script_slave *ss,
         return fd;
 }
 
+static int do_socket_close(const struct socket_ops *ops, struct script_slave *ss,
+                           int sockfd, struct addrinfo *ai)
+{
+        int r;
+
+        r = script_slave_close_hook(ss, sockfd, ai);
+        if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
+                errno = -r;
+                return -1;
+        }
+
+        return socket_close(ops, sockfd);
+}
+
 const struct socket_ops tcp_socket_ops = {
         .open = tcp_socket_open,
         .bind = bind,
@@ -150,20 +164,6 @@ uint32_t epoll_events(struct options *opts)
         if (opts->edge_trigger)
                 events |= EPOLLET;
         return events;
-}
-
-int do_socket_close(const struct socket_ops *ops, struct script_slave *ss,
-                    int sockfd, struct addrinfo *ai)
-{
-        int r;
-
-        r = script_slave_close_hook(ss, sockfd, ai);
-        if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
-                errno = -r;
-                return -1;
-        }
-
-        return socket_close(ops, sockfd);
 }
 
 void run_client(struct thread *t, const struct socket_ops *ops,
