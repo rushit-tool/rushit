@@ -41,10 +41,6 @@ struct flow *addflow_lite(int epfd, int fd, uint32_t events,
         return flow;
 }
 
-#ifndef SO_MAX_PACING_RATE
-#define SO_MAX_PACING_RATE 47
-#endif
-
 struct flow *addflow(int tid, int epfd, int fd, int flow_id, uint32_t events,
                      struct options *opts, struct callbacks *cb)
 {
@@ -53,10 +49,8 @@ struct flow *addflow(int tid, int epfd, int fd, int flow_id, uint32_t events,
 
         if (opts->debug)
                 set_debug(fd, 1, cb);
-        if (opts->max_pacing_rate) {
-                uint32_t m = opts->max_pacing_rate;
-                setsockopt(fd, SOL_SOCKET, SO_MAX_PACING_RATE, &m, sizeof(m));
-        }
+        if (opts->max_pacing_rate)
+                set_max_pacing_rate(fd, opts->max_pacing_rate, cb);
         set_nonblocking(fd, cb);
         if (opts->reuseaddr)
                 set_reuseaddr(fd, 1, cb);

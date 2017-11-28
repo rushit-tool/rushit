@@ -102,6 +102,7 @@ void set_reuseport(int fd, struct callbacks *cb);
 void set_nonblocking(int fd, struct callbacks *cb);
 void set_reuseaddr(int fd, int on, struct callbacks *cb);
 void set_debug(int fd, int onoff, struct callbacks *cb);
+void set_max_pacing_rate(int fd, uint32_t max_pacing_rate, struct callbacks *cb);
 void set_min_rto(int fd, int min_rto_ms, struct callbacks *cb);
 void set_local_host(int fd, struct options *opt, struct callbacks *cb);
 int procfile_int(const char *path, struct callbacks *cb);

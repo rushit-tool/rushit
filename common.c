@@ -155,6 +155,15 @@ void set_reuseaddr(int fd, int on, struct callbacks *cb)
                 PLOG_ERROR(cb, "setsockopt(SO_REUSEADDR)");
 }
 
+void set_max_pacing_rate(int fd, uint32_t rate, struct callbacks *cb)
+{
+#ifndef SO_MAX_PACING_RATE
+#define SO_MAX_PACING_RATE 47
+#endif
+        if (setsockopt(fd, SOL_SOCKET, SO_MAX_PACING_RATE, &rate, sizeof(rate)))
+                PLOG_ERROR(cb, "setsockopt(SO_MAX_PACING_RATE)");
+}
+
 void set_min_rto(int fd, int min_rto_ms, struct callbacks *cb)
 {
         int min_rto = min_rto_ms * 1000 * 1000;  /* in nanoseconds */
