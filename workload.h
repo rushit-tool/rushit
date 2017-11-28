@@ -26,6 +26,19 @@
 
 struct epoll_event;
 
+/* Set of all possible socket operations. open() is mandatory, rest is optional. */
+struct socket_ops {
+        int (*open)(const struct addrinfo *hints);
+        int (*bind)(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+        int (*listen)(int sockfd, int backlog);
+        int (*accept)(int sockfd, struct sockaddr *addr, socklen_t *addrlen);
+        int (*connect)(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
+        int (*close)(int sockfd);
+};
+
+/* Operations for TCP sockets. */
+extern const struct socket_ops tcp_socket_ops;
+
 /* Callback invoked from main thread loop for processing socket events. */
 typedef void (*process_events_t)(struct thread *t, int epoll_fd,
                                  struct epoll_event *events, int nfds,
@@ -36,22 +49,26 @@ typedef void (*process_events_t)(struct thread *t, int epoll_fd,
 void *buf_alloc(struct options *opts);
 
 /* Open, configure according to options, and connect a client socket. */
-int client_connect(struct thread *t);
+int client_connect(struct thread *t, const struct socket_ops *ops);
 
 /* Convert run-time options to a set of epoll events */
 uint32_t epoll_events(struct options *opts);
 
 /* Main routine for client threads, both stream & request/response workloads */
-void run_client(struct thread *t, process_events_t process_events);
+void run_client(struct thread *t, const struct socket_ops *ops,
+                process_events_t process_events);
 
 /* Main routine for server threads, both stream & request/response workloads */
-void run_server(struct thread *t, process_events_t process_events);
+void run_server(struct thread *t, const struct socket_ops *ops,
+                process_events_t process_events);
 
 /* XXX: Internal API. Still used by dummy_test. */
-int do_socket_open(struct script_slave *ss, struct addrinfo *ai);
+int do_socket_open(const struct socket_ops *ops, struct script_slave *ss,
+                   struct addrinfo *ai);
 
 /* XXX: Internal API. Still used by dummy_test. */
-int do_socket_close(struct script_slave *ss, int sockfd, struct addrinfo *ai);
+int do_socket_close(const struct socket_ops *ops, struct script_slave *ss,
+                    int sockfd, struct addrinfo *ai);
 
 
 #endif

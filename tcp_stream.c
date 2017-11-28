@@ -140,9 +140,9 @@ static void *worker_thread(void *arg)
         struct thread *t = arg;
         reset_port(t->ai, atoi(t->opts->port), t->cb);
         if (t->opts->client)
-                run_client(t, process_events);
+                run_client(t, &tcp_socket_ops, process_events);
         else
-                run_server(t, process_events);
+                run_server(t, &tcp_socket_ops, process_events);
         return NULL;
 }
 

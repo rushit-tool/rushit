@@ -245,9 +245,9 @@ static void *thread_start(void *arg)
         struct thread *t = arg;
         reset_port(t->ai, atoi(t->opts->port), t->cb);
         if (t->opts->client)
-                run_client(t, client_events);
+                run_client(t, &tcp_socket_ops, client_events);
         else
-                run_server(t, server_events);
+                run_server(t, &tcp_socket_ops, server_events);
         return NULL;
 }
 

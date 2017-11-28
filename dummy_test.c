@@ -36,6 +36,7 @@
 #include "lib.h"
 #include "logging.h"
 #include "thread.h"
+#include "workload.h"
 
 static struct flow fake_flow = {
         .fd = -1,
@@ -136,14 +137,14 @@ static void client_events(struct thread *t, int epfd,
         }
 }
 
-static void client_connect(int i, int epfd, struct thread *t)
+static void fake_client_connect(struct thread *t, const struct socket_ops *ops)
 {
         struct script_slave *ss = t->script_slave;
         struct callbacks *cb = t->cb;
         struct addrinfo *ai = t->ai;
         int fd;
 
-        fd = do_socket_open(ss, ai);
+        fd = do_socket_open(ops, ss, ai);
         if (fd == -1)
                 PLOG_FATAL(cb, "socket");
         /* STUB: Set socket options */
@@ -151,7 +152,7 @@ static void client_connect(int i, int epfd, struct thread *t)
         /* STUB: Add flow */
 }
 
-static void run_client(struct thread *t)
+static void run_dummy_client(struct thread *t, const struct socket_ops *ops)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
@@ -171,7 +172,7 @@ static void run_client(struct thread *t)
                 PLOG_FATAL(cb, "epoll_create1");
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         for (i = 0; i < flows_in_this_thread; i++)
-                client_connect(i, epfd, t);
+                fake_client_connect(t, ops);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
 
         /* STUB: Allocate buffers */
@@ -193,7 +194,7 @@ static void run_client(struct thread *t)
 
         /* XXX: Broken. No way to access sockets opened in client_connect() ATM. */
         for (i = 0; i < flows_in_this_thread; i++) {
-                if (do_socket_close(ss, -1, ai) < 0)
+                if (do_socket_close(ops, ss, -1, ai) < 0)
                         /* PLOG_FATAL(cb, "close"); */
                         /* XXX: ignore errors */ ;
         }
@@ -256,7 +257,7 @@ static void server_events(struct thread *t, int epfd,
         }
 }
 
-static void run_server(struct thread *t)
+static void run_dummy_server(struct thread *t, const struct socket_ops *ops)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
@@ -269,7 +270,7 @@ static void run_server(struct thread *t)
 
         assert(opts->maxevents > 0);
 
-        fd_listen = do_socket_open(ss, ai);
+        fd_listen = do_socket_open(ops, ss, ai);
         if (fd_listen == -1)
                 PLOG_FATAL(cb, "socket");
         /* STUB: Set socket options */
@@ -302,7 +303,7 @@ static void run_server(struct thread *t)
         }
 
         /* XXX: Sync threads? */
-        if (do_socket_close(ss, fd_listen, ai) < 0)
+        if (do_socket_close(ops, ss, fd_listen, ai) < 0)
                 PLOG_FATAL(cb, "close");
 
         /* Free resources */
@@ -322,9 +323,9 @@ static void *worker_thread(void *arg)
         reset_port(t->ai, atoi(opts->port), t->cb);
 
         if (opts->client)
-                run_client(t);
+                run_dummy_client(t, &tcp_socket_ops);
         else
-                run_server(t);
+                run_dummy_server(t, &tcp_socket_ops);
 
         return NULL;
 }

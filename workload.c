@@ -25,6 +25,42 @@
 #include "workload.h"
 
 
+static int tcp_socket_open(const struct addrinfo *hints)
+{
+        return socket(hints->ai_family, SOCK_STREAM, IPPROTO_TCP);
+}
+
+static int socket_bind(const struct socket_ops *ops, int sockfd,
+                       const struct sockaddr *addr, socklen_t addrlen)
+{
+        return ops->bind ? ops->bind(sockfd, addr, addrlen) : 0;
+}
+
+static int socket_listen(const struct socket_ops *ops, int sockfd, int backlog)
+{
+        return ops->listen ? ops->listen(sockfd, backlog) : 0;
+}
+
+static int socket_connect(const struct socket_ops *ops, int sockfd,
+                          const struct sockaddr *addr, socklen_t addrlen)
+{
+        return ops->connect ? ops->connect(sockfd, addr, addrlen) : 0;
+}
+
+static int socket_close(const struct socket_ops *ops, int sockfd)
+{
+        return ops->close ? ops->close(sockfd) : 0;
+}
+
+const struct socket_ops tcp_socket_ops = {
+        .open = tcp_socket_open,
+        .bind = bind,
+        .listen = listen,
+        .accept = accept,
+        .connect = do_connect,
+        .close = do_close,
+};
+
 void *buf_alloc(struct options *opts)
 {
         size_t alloc_size = opts->request_size;
@@ -46,7 +82,7 @@ void *buf_alloc(struct options *opts)
         return buf;
 }
 
-int client_connect(struct thread *t)
+int client_connect(struct thread *t, const struct socket_ops *ops)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
@@ -54,7 +90,7 @@ int client_connect(struct thread *t)
         struct addrinfo *ai = t->ai;
         int fd;
 
-        fd = do_socket_open(ss, ai);
+        fd = do_socket_open(ops, ss, ai);
         if (fd == -1) {
                 PLOG_FATAL(cb, "socket");
                 return fd;
@@ -66,8 +102,8 @@ int client_connect(struct thread *t)
                 set_debug(fd, 1, cb);
         if (opts->local_host)
                 set_local_host(fd, opts, cb);
-        if (do_connect(fd, ai->ai_addr, ai->ai_addrlen))
-                PLOG_FATAL(cb, "do_connect");
+        if (socket_connect(ops, fd, ai->ai_addr, ai->ai_addrlen))
+                PLOG_FATAL(cb, "socket_connect");
 
         return fd;
 }
@@ -84,19 +120,20 @@ uint32_t epoll_events(struct options *opts)
         return events;
 }
 
-int do_socket_open(struct script_slave *ss, struct addrinfo *ai)
+int do_socket_open(const struct socket_ops *ops, struct script_slave *ss,
+                   struct addrinfo *ai)
 {
         int fd, r;
 
         assert(ai);
 
-        fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        fd = ops->open(ai);
         if (fd == -1)
                 return -1;
 
         r = script_slave_socket_hook(ss, fd, ai);
         if (r < 0 && r != -EHOOKEMPTY && r != -EHOOKRETVAL) {
-                do_close(fd);
+                socket_close(ops, fd);
                 errno = -r;
                 return -1;
         }
@@ -104,7 +141,8 @@ int do_socket_open(struct script_slave *ss, struct addrinfo *ai)
         return fd;
 }
 
-int do_socket_close(struct script_slave *ss, int sockfd, struct addrinfo *ai)
+int do_socket_close(const struct socket_ops *ops, struct script_slave *ss,
+                    int sockfd, struct addrinfo *ai)
 {
         int r;
 
@@ -114,10 +152,11 @@ int do_socket_close(struct script_slave *ss, int sockfd, struct addrinfo *ai)
                 return -1;
         }
 
-        return do_close(sockfd);
+        return socket_close(ops, sockfd);
 }
 
-void run_client(struct thread *t, process_events_t process_events)
+void run_client(struct thread *t, const struct socket_ops *ops,
+                process_events_t process_events)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
@@ -132,6 +171,8 @@ void run_client(struct thread *t, process_events_t process_events)
         char *buf;
         CLEANUP(free) int *client_fds = NULL;
 
+        assert(ops);
+
         client_fds = calloc(flows_in_this_thread, sizeof(int));
         if (!client_fds)
                 PLOG_FATAL(cb, "alloc client_fds array");
@@ -142,7 +183,7 @@ void run_client(struct thread *t, process_events_t process_events)
                 PLOG_FATAL(cb, "epoll_create1");
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         for (i = 0; i < flows_in_this_thread; i++) {
-                fd = client_connect(t);
+                fd = client_connect(t, ops);
 
                 flow = addflow(t->index, epfd, fd, i, epoll_events(opts), opts, cb);
                 flow->bytes_to_write = opts->request_size;
@@ -169,7 +210,7 @@ void run_client(struct thread *t, process_events_t process_events)
         }
 
         for (i = 0; i < flows_in_this_thread; i++) {
-                if (do_socket_close(ss, client_fds[i], ai) < 0)
+                if (do_socket_close(ops, ss, client_fds[i], ai) < 0)
                         /* PLOG_FATAL(cb, "close"); */
                         /* XXX: ignore errors */ ;
         }
@@ -180,7 +221,8 @@ void run_client(struct thread *t, process_events_t process_events)
         do_close(epfd);
 }
 
-void run_server(struct thread *t, process_events_t process_events)
+void run_server(struct thread *t, const struct socket_ops *ops,
+                process_events_t process_events)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
@@ -192,16 +234,18 @@ void run_server(struct thread *t, process_events_t process_events)
         int fd_listen, epfd;
         char *buf;
 
-        fd_listen = do_socket_open(ss, ai);
+        assert(ops);
+
+        fd_listen = do_socket_open(ops, ss, ai);
         if (fd_listen == -1)
                 PLOG_FATAL(cb, "socket");
         set_reuseport(fd_listen, cb);
         set_reuseaddr(fd_listen, 1, cb);
-        if (bind(fd_listen, ai->ai_addr, ai->ai_addrlen))
+        if (socket_bind(ops, fd_listen, ai->ai_addr, ai->ai_addrlen))
                 PLOG_FATAL(cb, "bind");
         if (opts->min_rto)
                 set_min_rto(fd_listen, opts->min_rto, cb);
-        if (listen(fd_listen, opts->listen_backlog))
+        if (socket_listen(ops, fd_listen, opts->listen_backlog))
                 PLOG_FATAL(cb, "listen");
         epfd = epoll_create1(0);
         if (epfd == -1)
@@ -224,7 +268,7 @@ void run_server(struct thread *t, process_events_t process_events)
                 process_events(t, epfd, events, nfds, fd_listen, buf);
         }
 
-        if (do_socket_close(ss, fd_listen, ai) < 0)
+        if (do_socket_close(ops, ss, fd_listen, ai) < 0)
                 PLOG_FATAL(cb, "close");
 
         free(buf);
