@@ -42,18 +42,12 @@ struct flow *addflow_lite(int epfd, int fd, uint32_t events,
 }
 
 struct flow *addflow(int tid, int epfd, int fd, int flow_id, uint32_t events,
-                     struct options *opts, struct callbacks *cb)
+                     struct callbacks *cb)
 {
         struct epoll_event ev;
         struct flow *flow;
 
-        if (opts->debug)
-                set_debug(fd, 1, cb);
-        if (opts->max_pacing_rate)
-                set_max_pacing_rate(fd, opts->max_pacing_rate, cb);
         set_nonblocking(fd, cb);
-        if (opts->reuseaddr)
-                set_reuseaddr(fd, 1, cb);
         flow = calloc(1, sizeof(struct flow));
         flow->fd = fd;
         flow->id = flow_id;

@@ -151,8 +151,10 @@ static void server_accept(int fd_listen, int epfd, struct thread *t)
                 PLOG_ERROR(cb, "accept");
                 return;
         }
+        setup_connected_socket(client, opts, cb);
+
         flow = addflow(t->index, epfd, client, t->next_flow_id++,
-                       EPOLLIN, opts, cb);
+                       EPOLLIN, cb);
         flow->bytes_to_read = opts->request_size;
         flow->itv = interval_create(opts->interval, t);
 }

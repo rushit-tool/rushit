@@ -166,6 +166,16 @@ uint32_t epoll_events(struct options *opts)
         return events;
 }
 
+void setup_connected_socket(int fd, struct options *opts, struct callbacks *cb)
+{
+        if (opts->debug)
+                set_debug(fd, 1, cb);
+        if (opts->max_pacing_rate)
+                set_max_pacing_rate(fd, opts->max_pacing_rate, cb);
+        if (opts->reuseaddr)
+                set_reuseaddr(fd, 1, cb);
+}
+
 void run_client(struct thread *t, const struct socket_ops *ops,
                 process_events_t process_events)
 {
@@ -195,8 +205,9 @@ void run_client(struct thread *t, const struct socket_ops *ops,
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         for (i = 0; i < flows_in_this_thread; i++) {
                 fd = client_connect(t, ops);
+                setup_connected_socket(fd, opts, cb);
 
-                flow = addflow(t->index, epfd, fd, i, epoll_events(opts), opts, cb);
+                flow = addflow(t->index, epfd, fd, i, epoll_events(opts), cb);
                 flow->bytes_to_write = opts->request_size;
                 flow->itv = interval_create(opts->interval, t);
 

@@ -51,6 +51,9 @@ typedef void (*process_events_t)(struct thread *t, int epoll_fd,
 /* Convert run-time options to a set of epoll events */
 uint32_t epoll_events(struct options *opts);
 
+/* Configure a connected socket according to run-time options */
+void setup_connected_socket(int fd, struct options *opts, struct callbacks *cb);
+
 /* Main routine for client threads, both stream & request/response workloads */
 void run_client(struct thread *t, const struct socket_ops *ops,
                 process_events_t process_events);
