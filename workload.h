@@ -62,5 +62,8 @@ void run_client(struct thread *t, const struct socket_ops *ops,
 void run_server(struct thread *t, const struct socket_ops *ops,
                 process_events_t process_events);
 
+/* Calculate and print out statistics for a stream workload */
+void report_stream_stats(struct thread *tinfo);
+
 
 #endif
