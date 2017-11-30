@@ -202,7 +202,7 @@ $(unit-test-dir)/t_script: $(t_script-objs)
 
 $(tests-unit): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
-$(tests-func): dummy_test tcp_stream tcp_rr
+$(tests-func): $(binaries)
 
 build-tests: $(tests-unit)
 

@@ -1,0 +1,53 @@
+#!/bin/bash
+
+set -o errexit
+
+# Need at least one argument
+(( $# )) || {
+	echo 2>&1 "USAGE: $0 <workload> [ <server opts> [ -- <client opts> ] ]"
+	exit
+}
+
+#
+# Parse arguments
+#
+
+workload=$1
+shift
+
+[ -x "${workload}" ] || {
+	echo 2>&1 "ERROR: '${workload}' is not an executable"
+	exit 1
+}
+
+server_opts=
+while (( $# )); do
+	case $1 in
+	--) shift; break ;;
+	*) server_opts="${server_opts} $1" ;;
+	esac
+	shift
+done
+
+client_opts=
+while (( $# )); do
+	case $1 in
+	--) shift; break ;;
+	*) client_opts="${client_opts} $1" ;;
+	esac
+	shift
+done
+
+#
+# Run workload
+#
+
+echo 2>&1 "* Running server: ${workload} ${server_opts}"
+${workload} ${server_opts} > /dev/null &
+server_pid=$!
+
+echo 2>&1 "* Running client: ${workload} --client ${client_opts}"
+${workload} --client ${client_opts} > /dev/null &
+client_pid=$!
+
+wait ${client_pid} ${server_pid}
