@@ -274,7 +274,11 @@ void run_server(struct thread *t, const struct socket_ops *ops,
         epfd = epoll_create1(0);
         if (epfd == -1)
                 PLOG_FATAL(cb, "epoll_create1");
-        listen_fl = addflow_lite(epfd, fd_listen, EPOLLIN, cb);
+
+        listen_fl = addflow(t->index, epfd, fd_listen, t->next_flow_id++,
+                            EPOLLIN, cb);
+        listen_fl->itv = interval_create(opts->interval, t);
+
         stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
         events = calloc(opts->maxevents, sizeof(struct epoll_event));
         buf = buf_alloc(opts);
@@ -294,11 +298,11 @@ void run_server(struct thread *t, const struct socket_ops *ops,
 
         if (do_socket_close(ops, ss, fd_listen, ai) < 0)
                 PLOG_FATAL(cb, "close");
+        delflow(t->index, epfd, listen_fl, cb);
 
         free(buf);
         free(events);
         free(stop_fl);
-        free(listen_fl);
         do_close(epfd);
 }
 
