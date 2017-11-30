@@ -65,6 +65,7 @@ struct flow *addflow(int tid, int epfd, int fd, int flow_id, uint32_t events,
 void delflow(int tid, int epfd, struct flow *flow, struct callbacks *cb)
 {
         interval_destroy(flow->itv);
+        numlist_destroy(flow->latency);
         epoll_del_or_err(epfd, flow->fd, cb);
         do_close(flow->fd);
         LOG_INFO(cb, "tid=%d, flow_id=%d", tid, flow->id);
