@@ -274,7 +274,8 @@ void run_server(struct thread *t, const struct socket_ops *ops,
         fd_listen = do_socket_open(ops, ss, ai);
         if (fd_listen == -1)
                 PLOG_FATAL(cb, "socket");
-        set_reuseport(fd_listen, cb);
+        if (opts->reuseport)
+                set_reuseport(fd_listen, cb);
         set_reuseaddr(fd_listen, 1, cb);
         if (socket_bind(ops, fd_listen, ai->ai_addr, ai->ai_addrlen))
                 PLOG_FATAL(cb, "bind");

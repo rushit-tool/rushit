@@ -106,6 +106,9 @@ int main(int argc, char **argv)
         opts.enable_write = true;
         opts.enable_read = true;
 
+        /* XXX: Fixed mode. Always multiplex server port. */
+        opts.reuseport = true;
+
         check_options(&opts, &cb);
         if (opts.suicide_length) {
                 if (create_suicide_timeout(opts.suicide_length)) {

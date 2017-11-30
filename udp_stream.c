@@ -98,8 +98,11 @@ readerr_again:
 static void *worker_thread(void *arg)
 {
         struct thread *t = arg;
+        struct options *opts = t->opts;
+        int port_off;
 
-        reset_port(t->ai, atoi(t->opts->port), t->cb);
+        port_off = opts->reuseport ? 0 : t->index;
+        reset_port(t->ai, atoi(opts->port) + port_off, t->cb);
 
         if (t->opts->client)
                 run_client(t, &udp_socket_ops, process_events);

@@ -102,6 +102,9 @@ int main(int argc, char **argv)
         else
                 opts.enable_read = true;
 
+        /* XXX: Fixed mode. Always multiplex server port. */
+        opts.reuseport = true;
+
         flags_parser_dump(fp);
         flags_parser_destroy(fp);
 

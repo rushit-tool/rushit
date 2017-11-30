@@ -70,6 +70,7 @@ struct options {
         bool dry_run;
         bool pin_cpu;
         bool reuseaddr;
+        bool reuseport;
         bool logtostderr;
         bool nonblocking;
         double interval;

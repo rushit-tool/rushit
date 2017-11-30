@@ -63,6 +63,7 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, bool,          ipv6,            false,   '6', "Set desired address family to AF_INET6");
         DEFINE_FLAG(fp, bool,          client,          false,   'c', "Is client?");
         DEFINE_FLAG(fp, bool,          dry_run,         false,   'n', "Turn on dry-run mode");
+        DEFINE_FLAG(fp, bool,          reuseport,       false,    0,  "Multiplex server port (use SO_REUSEPORT)");
         DEFINE_FLAG(fp, bool,          logtostderr,     false,   'V', "Log to stderr");
         DEFINE_FLAG(fp, bool,          nonblocking,     false,    0,  "Make sure syscalls are all nonblocking");
         DEFINE_FLAG(fp, bool,          edge_trigger,    false,   'E', "Edge-triggered epoll");
