@@ -3,6 +3,7 @@
 set -o errexit
 
 basedir=$(dirname "$0")
+topdir=${basedir}/../..
 script=$basedir/exec-order.lua
 server_out=$(mktemp)
 client_out=$(mktemp)
@@ -21,10 +22,10 @@ cleanup() {
 
 trap cleanup EXIT
 
-./dummy_test --script $script > /dev/null 2> $server_out &
+${topdir}/dummy_test --script $script | grep '^[0-9]$' > $server_out &
 server_pid=$!
 
-./dummy_test --script $script --client --test-length 1 > /dev/null 2> $client_out &
+${topdir}/dummy_test --script $script --client --test-length 1 | grep '^[0-9]$' > $client_out &
 client_pid=$!
 
 wait $client_pid

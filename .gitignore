@@ -6,6 +6,7 @@
 dummy_test
 tcp_rr
 tcp_stream
+udp_stream
 
 # Tests
 t_script

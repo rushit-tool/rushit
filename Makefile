@@ -16,6 +16,8 @@
 #
 # Makefile.
 
+SHELL = /bin/bash
+
 # Recommended flags (may be overridden by the user from environment/command line)
 CPPFLAGS =
 CFLAGS   = -std=c99 -Wall -Werror -O3 -g
@@ -72,13 +74,15 @@ base-objs := \
 	script_prelude.o \
 	serialize.o \
 	thread.o \
-	version.o
+	version.o \
+	workload.o
 
 tcp_rr-objs := tcp_rr_main.o tcp_rr.o
 tcp_stream-objs := tcp_stream_main.o tcp_stream.o
 dummy_test-objs := dummy_test_main.o dummy_test.o
+udp_stream-objs := udp_stream_main.o udp_stream.o
 
-binaries := tcp_rr tcp_stream dummy_test
+binaries := tcp_rr tcp_stream dummy_test udp_stream
 
 default: all
 
@@ -103,7 +107,7 @@ endif
 	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' > $@;
 
 $(base-objs): $(luajit-lib)
-$(binaries) $(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
+$(binaries) $(tests-unit): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
 tcp_rr: $(tcp_rr-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
@@ -112,6 +116,9 @@ tcp_stream: $(tcp_stream-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 dummy_test: $(dummy_test-objs)
+	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
+
+udp_stream: $(udp_stream-objs)
 	$(CC) -o $@ $^ $(ALL_CFLAGS) $(ALL_LDFLAGS) $(ALL_LDLIBS)
 
 all: $(binaries)
@@ -185,32 +192,34 @@ unit-test-dir  := $(test-dir)/unit
 unit-test-libs := $(shell pkg-config --libs cmocka)
 
 t_script-objs := $(unit-test-dir)/t_script.o
-test-binaries := $(unit-test-dir)/t_script
+tests-unit := $(unit-test-dir)/t_script
+tests-func := $(wildcard $(func-test-dir)/[0-9][0-9][0-9][0-9])
 
 -include $(t_script-objs:.o=.d)
 
 $(unit-test-dir)/t_script: $(t_script-objs)
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $^ $(ALL_LDFLAGS) $(ALL_LDLIBS) $(unit-test-libs)
 
-$(test-binaries): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
+$(tests-unit): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
 
-build-tests: $(test-binaries)
+$(tests-func): $(binaries)
+
+build-tests: $(tests-unit)
 
 clean-tests:
-	$(RM) -f $(unit-test-dir)/*.[do] $(test-binaries)
+	$(RM) -f $(unit-test-dir)/*.[do] $(tests-unit)
 
-check-unit: $(test-binaries)
-	$(unit-test-dir)/t_script
+check-unit: $(tests-unit)
+	if [ -x "$$(type -P avocado)" ]; \
+	then avocado run $(sort $(tests-unit)); \
+	else for t in $(sort $(tests-unit)); do $$t; done; \
+	fi
 
-check-func: dummy_test tcp_stream tcp_rr
-	$(func-test-dir)/0001
-	$(func-test-dir)/0002
-	$(func-test-dir)/0003
-	$(func-test-dir)/0004
-	$(func-test-dir)/0005
-	$(func-test-dir)/0006
-	$(func-test-dir)/0007
-	$(func-test-dir)/0008
+check-func: $(tests-func)
+	if [ -x "$$(type -P avocado)" ]; \
+	then avocado run $(sort $(tests-func)); \
+	else for t in $(sort $(tests-func)); do $$t; done; \
+	fi
 
 check: check-unit check-func
 

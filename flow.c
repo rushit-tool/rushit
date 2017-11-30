@@ -41,32 +41,23 @@ struct flow *addflow_lite(int epfd, int fd, uint32_t events,
         return flow;
 }
 
-#ifndef SO_MAX_PACING_RATE
-#define SO_MAX_PACING_RATE 47
-#endif
-
 struct flow *addflow(int tid, int epfd, int fd, int flow_id, uint32_t events,
-                     struct options *opts, struct callbacks *cb)
+                     struct callbacks *cb)
 {
         struct epoll_event ev;
         struct flow *flow;
 
-        if (opts->debug)
-                set_debug(fd, 1, cb);
-        if (opts->max_pacing_rate) {
-                uint32_t m = opts->max_pacing_rate;
-                setsockopt(fd, SOL_SOCKET, SO_MAX_PACING_RATE, &m, sizeof(m));
-        }
         set_nonblocking(fd, cb);
-        if (opts->reuseaddr)
-                set_reuseaddr(fd, 1, cb);
+
         flow = calloc(1, sizeof(struct flow));
         flow->fd = fd;
         flow->id = flow_id;
         flow->latency = numlist_create(cb);
+
         ev.events = EPOLLRDHUP | events;
         ev.data.ptr = flow;
         epoll_ctl_or_die(epfd, EPOLL_CTL_ADD, fd, &ev, cb);
+
         LOG_INFO(cb, "tid=%d, flow_id=%d", tid, flow->id);
         return flow;
 }
@@ -74,6 +65,7 @@ struct flow *addflow(int tid, int epfd, int fd, int flow_id, uint32_t events,
 void delflow(int tid, int epfd, struct flow *flow, struct callbacks *cb)
 {
         interval_destroy(flow->itv);
+        numlist_destroy(flow->latency);
         epoll_del_or_err(epfd, flow->fd, cb);
         do_close(flow->fd);
         LOG_INFO(cb, "tid=%d, flow_id=%d", tid, flow->id);

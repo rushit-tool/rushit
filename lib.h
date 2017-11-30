@@ -70,6 +70,7 @@ struct options {
         bool dry_run;
         bool pin_cpu;
         bool reuseaddr;
+        bool reuseport;
         bool logtostderr;
         bool nonblocking;
         double interval;
@@ -81,7 +82,7 @@ struct options {
         const char *all_samples;
         const char *script;
 
-        /* tcp_stream */
+        /* tcp_stream, udp_stream */
         bool enable_read;
         bool enable_write;
         bool edge_trigger;
@@ -95,5 +96,7 @@ struct options {
 
 int tcp_stream(struct options *opts, struct callbacks *cb);
 int tcp_rr(struct options *opts, struct callbacks *cb);
+
+int udp_stream(struct options *opts, struct callbacks *cb);
 
 #endif

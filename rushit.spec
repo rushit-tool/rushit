@@ -28,7 +28,7 @@ make %{?_smp_mflags}
 mkdir -p $RPM_BUILD_ROOT/%{_bindir}/    \
     $RPM_BUILD_ROOT/%{_datadir}/rushit/ \
     $RPM_BUILD_ROOT/%{_docdir}/rushit/
-install -p -t $RPM_BUILD_ROOT/%{_bindir}/ tcp_stream tcp_rr
+install -p -t $RPM_BUILD_ROOT/%{_bindir}/ tcp_stream tcp_rr udp_stream
 install -p -m 0644 -t $RPM_BUILD_ROOT/%{_datadir}/rushit/ scripts/*.lua
 install -p -m 0644 -t $RPM_BUILD_ROOT/%{_docdir}/rushit/ README.md README.neper.md
 

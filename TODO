@@ -3,18 +3,31 @@ BUGS:
   make` to investigate
 * logging to standard error doesn't work when the process is launched
   from a directory that is not writable (i.e. can't create a log file)
+* MSG_MORE will never get exercised with request/response workload
+  because the buffer size is determined from request/response size.
+* Reads from socket error queue when edge-trigger epoll in use should
+  probably be retired until EAGAIN.
+* Use time of last received packet for throughput/TPS calculation.
+* Flows for client sockets are never destroyed.
 
 TESTS:
 * Add a test runner (Avocado?)
 
 BUILD:
-* fix parallel builds (make -jN)
-* import cmocka into the source tree
+* Import cmocka into the source tree?
 * support for out-of-source-tree builds
+* Check for tests dependencies (cmocka, Avocado)
 
 COSMETIC/QUALITY:
-* split start_worker_threads() into create_*() and start_*(); right
-  now it is doing two things and the interface is asymmetric with
-  {stop,free}_worker_threads()
 * replace #ifndef NEPER_... header include guards with #pragma once
 * move library sources under lib/ and program sources under src/
+* Merge *_main.c modules into workload modules?  The former don't
+  serve much purpose apart from parting command line options.
+* Stop passing around struct callbacks.
+* Introduce x*alloc() wrappers that terminate process on OOM.
+* Split up received bytes/transactions sampling at regular intervals
+  from intialization of rusage stats (rusage_start) and wall-clock
+  time (time_start) at the start of the run. They are not related.
+* Switch -v and -V short flags as being verbose is used more often
+  than querying version. This also will make us compatible with
+  netperf in this regard.

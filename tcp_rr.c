@@ -32,6 +32,7 @@
 #include "percentiles.h"
 #include "sample.h"
 #include "thread.h"
+#include "workload.h"
 
 static inline void track_write_time(struct options *opts, struct flow *flow)
 {
@@ -49,7 +50,8 @@ static inline void track_finish_time(struct flow *flow)
 }
 
 static void client_events(struct thread *t, int epfd,
-                          struct epoll_event *events, int nfds, char *buf)
+                          struct epoll_event *events, int nfds,
+                          int listen_fd, char *buf)
 {
         struct script_slave *ss = t->script_slave;
         struct options *opts = t->opts;
@@ -57,6 +59,8 @@ static void client_events(struct thread *t, int epfd,
         struct flow *flow;
         ssize_t num_bytes;
         int i;
+
+        UNUSED(listen_fd);
 
         for (i = 0; i < nfds; i++) {
                 flow = events[i].data.ptr;
@@ -121,48 +125,6 @@ static void client_events(struct thread *t, int epfd,
         }
 }
 
-static void *buf_alloc(struct options *opts)
-{
-        size_t alloc_size = opts->request_size;
-
-        if (alloc_size < opts->response_size)
-                alloc_size = opts->response_size;
-        if (alloc_size > opts->buffer_size)
-                alloc_size = opts->buffer_size;
-        return calloc(alloc_size, sizeof(char));
-}
-
-static int client_connect(int i, int epfd, struct thread *t)
-{
-        struct script_slave *ss = t->script_slave;
-        struct options *opts = t->opts;
-        struct callbacks *cb = t->cb;
-        struct addrinfo *ai = t->ai;
-        struct flow *flow;
-        int fd;
-
-        fd = do_socket_open(ss, ai);
-        if (fd == -1) {
-                PLOG_FATAL(cb, "socket");
-                return fd;
-        }
-
-        if (opts->min_rto)
-                set_min_rto(fd, opts->min_rto, cb);
-        if (opts->debug)
-                set_debug(fd, 1, cb);
-        if (opts->local_host)
-                set_local_host(fd, opts, cb);
-        if (do_connect(fd, ai->ai_addr, ai->ai_addrlen))
-                PLOG_FATAL(cb, "do_connect");
-
-        flow = addflow(t->index, epfd, fd, i, EPOLLOUT, opts, cb);
-        flow->bytes_to_write = opts->request_size;
-        flow->itv = interval_create(opts->interval, t);
-
-        return fd;
-}
-
 /**
  * The function expects @fd_listen is in a "ready" state in the @epfd
  * epoll set, and directly calls accept() on @fd_listen. The readiness
@@ -189,62 +151,12 @@ static void server_accept(int fd_listen, int epfd, struct thread *t)
                 PLOG_ERROR(cb, "accept");
                 return;
         }
+        setup_connected_socket(client, opts, cb);
+
         flow = addflow(t->index, epfd, client, t->next_flow_id++,
-                       EPOLLIN, opts, cb);
+                       EPOLLIN, cb);
         flow->bytes_to_read = opts->request_size;
         flow->itv = interval_create(opts->interval, t);
-}
-
-static void run_client(struct thread *t)
-{
-        struct script_slave *ss = t->script_slave;
-        struct options *opts = t->opts;
-        const int flows_in_this_thread = flows_in_thread(opts->num_flows,
-                                                         opts->num_threads,
-                                                         t->index);
-        struct callbacks *cb = t->cb;
-        struct addrinfo *ai = t->ai;
-        struct epoll_event *events;
-        struct flow *stop_fl;
-        int epfd, i;
-        char *buf;
-        CLEANUP(free) int *client_fds = NULL;
-
-        client_fds = calloc(flows_in_this_thread, sizeof(int));
-        if (!client_fds)
-                PLOG_FATAL(cb, "alloc client_fds array");
-
-        LOG_INFO(cb, "flows_in_this_thread=%d", flows_in_this_thread);
-        epfd = epoll_create1(0);
-        if (epfd == -1)
-                PLOG_FATAL(cb, "epoll_create1");
-        stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
-        for (i = 0; i < flows_in_this_thread; i++)
-                client_fds[i] = client_connect(i, epfd, t);
-        events = calloc(opts->maxevents, sizeof(struct epoll_event));
-        buf = buf_alloc(opts);
-        pthread_barrier_wait(t->ready);
-        while (!t->stop) {
-                int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds = epoll_wait(epfd, events, opts->maxevents, ms);
-                if (nfds == -1) {
-                        if (errno == EINTR)
-                                continue;
-                        PLOG_FATAL(cb, "epoll_wait");
-                }
-                client_events(t, epfd, events, nfds, buf);
-        }
-
-        for (i = 0; i < flows_in_this_thread; i++) {
-                if (do_socket_close(ss, client_fds[i], ai) < 0)
-                        /* PLOG_FATAL(cb, "close"); */
-                        /* XXX: ignore errors */ ;
-        }
-
-        free(buf);
-        free(events);
-        free(stop_fl);
-        do_close(epfd);
 }
 
 static void server_events(struct thread *t, int epfd,
@@ -330,66 +242,14 @@ static void server_events(struct thread *t, int epfd,
         }
 }
 
-static void run_server(struct thread *t)
-{
-        struct script_slave *ss = t->script_slave;
-        struct options *opts = t->opts;
-        struct callbacks *cb = t->cb;
-        struct addrinfo *ai = t->ai;
-        struct epoll_event *events;
-        struct flow *listen_fl;
-        struct flow *stop_fl;
-        int fd_listen, epfd;
-        char *buf;
-
-        fd_listen = do_socket_open(ss, ai);
-        if (fd_listen == -1)
-                PLOG_FATAL(cb, "socket");
-        set_reuseport(fd_listen, cb);
-        set_reuseaddr(fd_listen, 1, cb);
-        if (bind(fd_listen, ai->ai_addr, ai->ai_addrlen))
-                PLOG_FATAL(cb, "bind");
-        if (opts->min_rto)
-                set_min_rto(fd_listen, opts->min_rto, cb);
-        if (listen(fd_listen, opts->listen_backlog))
-                PLOG_FATAL(cb, "listen");
-        epfd = epoll_create1(0);
-        if (epfd == -1)
-                PLOG_FATAL(cb, "epoll_create1");
-        listen_fl = addflow_lite(epfd, fd_listen, EPOLLIN, cb);
-        stop_fl = addflow_lite(epfd, t->stop_efd, EPOLLIN, cb);
-        events = calloc(opts->maxevents, sizeof(struct epoll_event));
-        buf = buf_alloc(opts);
-        pthread_barrier_wait(t->ready);
-        while (!t->stop) {
-                int ms = opts->nonblocking ? 10 /* milliseconds */ : -1;
-                int nfds = epoll_wait(epfd, events, opts->maxevents, ms);
-                if (nfds == -1) {
-                        if (errno == EINTR)
-                                continue;
-                        PLOG_FATAL(cb, "epoll_wait");
-                }
-                server_events(t, epfd, events, nfds, fd_listen, buf);
-        }
-
-        if (do_socket_close(ss, fd_listen, ai) < 0)
-                PLOG_FATAL(cb, "close");
-
-        free(buf);
-        free(events);
-        free(stop_fl);
-        free(listen_fl);
-        do_close(epfd);
-}
-
 static void *thread_start(void *arg)
 {
         struct thread *t = arg;
         reset_port(t->ai, atoi(t->opts->port), t->cb);
         if (t->opts->client)
-                run_client(t);
+                run_client(t, &tcp_socket_ops, client_events);
         else
-                run_server(t);
+                run_server(t, &tcp_socket_ops, server_events);
         return NULL;
 }
 
