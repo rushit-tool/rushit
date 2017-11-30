@@ -32,6 +32,11 @@ static int tcp_socket_open(const struct addrinfo *hints)
         return socket(hints->ai_family, SOCK_STREAM, IPPROTO_TCP);
 }
 
+static int udp_socket_open(const struct addrinfo *hints)
+{
+        return socket(hints->ai_family, SOCK_DGRAM, IPPROTO_UDP);
+}
+
 static int socket_bind(const struct socket_ops *ops, int sockfd,
                        const struct sockaddr *addr, socklen_t addrlen)
 {
@@ -105,6 +110,12 @@ const struct socket_ops tcp_socket_ops = {
         .accept = accept,
         .connect = do_connect,
         .close = do_close,
+};
+
+const struct socket_ops udp_socket_ops = {
+        .open = udp_socket_open,
+        .bind = bind,
+        .connect = do_connect,
 };
 
 /* Allocate and initialize a buffer big enough for sending/receiving. */

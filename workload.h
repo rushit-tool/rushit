@@ -42,6 +42,9 @@ struct socket_ops {
 /* Operations for TCP sockets. */
 extern const struct socket_ops tcp_socket_ops;
 
+/* Operations for connected UDP sockets. */
+extern const struct socket_ops udp_socket_ops;
+
 /* Callback invoked from main thread loop for processing socket events. */
 typedef void (*process_events_t)(struct thread *t, int epoll_fd,
                                  struct epoll_event *events, int nfds,

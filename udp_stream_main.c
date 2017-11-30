@@ -65,8 +65,6 @@ int main(int argc, char **argv)
         DEFINE_FLAG(fp, bool,          dry_run,         false,   'n', "Turn on dry-run mode");
         DEFINE_FLAG(fp, bool,          logtostderr,     false,   'V', "Log to stderr");
         DEFINE_FLAG(fp, bool,          nonblocking,     false,    0,  "Make sure syscalls are all nonblocking");
-        DEFINE_FLAG(fp, bool,          enable_read,     false,   'r', "Read from flows? enabled by default for the server");
-        DEFINE_FLAG(fp, bool,          enable_write,    false,   'w', "Write to flows? Enabled by default for the client");
         DEFINE_FLAG(fp, bool,          edge_trigger,    false,   'E', "Edge-triggered epoll");
         DEFINE_FLAG(fp, double,        interval,        1.0,     'I', "For how many seconds that a sample is generated");
         DEFINE_FLAG(fp, const char *,  local_host,      NULL,    'L', "Local hostname or IP address");
