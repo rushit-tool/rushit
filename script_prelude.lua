@@ -35,9 +35,11 @@ struct addrinfo {
 local C = S.c
 
 AF_INET = C.AF.INET
+AF_INET6 = C.AF.INET6
 -- ...
 
 SOCK_STREAM = C.SOCK.STREAM
+SOCK_DGRAM = C.SOCK.DGRAM
 -- ...
 
 IP_TOS                    = C.IP.TOS
@@ -204,13 +206,20 @@ SOF_TIMESTAMPING_OPT_TX_SWHW  = C.SOF.TIMESTAMPING_OPT_TX_SWHW
 local T = S.types.t
 local PT = S.types.pt
 
+in_addr = T.in_addr
+in6_addr = T.in6_addr
+
 sockaddr_in = T.sockaddr_in
+sockaddr_storage = T.sockaddr_storage
+
 scm_timestamping = PT.scm_timestamping
 
 --
 -- Functions
 --
 getsockopt = S.getsockopt
+recvfrom = S.recvfrom
 recvmsg = S.recvmsg
 sendmsg = S.sendmsg
+sendto = S.sendto
 setsockopt = S.setsockopt

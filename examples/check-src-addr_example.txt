@@ -1,0 +1,116 @@
+Example of verifying the client address to ensure it's the expected one.
+
+We expect to receive packets over loopback from 127.0.0.1. The
+expected source address is hardcoded in the script. The script works
+only for IPv4. To use it with IPv6 you will need to adapt it.
+
+Start the server:
+
+server $ ./udp_stream -4 --script ./examples/check-src-addr.lua
+[...]
+script=./examples/check-src-addr.lua
+total_run_time=10
+
+From another terminal start the client:
+
+client $ ./udp_stream -4 -c
+VERSION=1.1.0
+all_samples=
+port=12867
+control_port=12866
+host=
+local_host=
+interval=1.000000
+edge_trigger=0
+nonblocking=0
+logtostderr=0
+reuseport=0
+dry_run=0
+client=1
+ipv6=0
+ipv4=1
+suicide_length=0
+buffer_size=16384
+test_length=10
+num_clients=1
+num_threads=1
+num_flows=1
+maxevents=1000
+magic=42
+script=
+total_run_time=10
+invalid_secret_count=0
+time_start=0.000000000
+utime_start=0.011164
+utime_end=0.190635
+stime_start=0.001021
+stime_end=6.745937
+maxrss_start=10408
+maxrss_end=10408
+minflt_start=667
+minflt_end=667
+majflt_start=0
+majflt_end=0
+nvcsw_start=2
+nvcsw_end=3
+nivcsw_start=0
+nivcsw_end=136
+client $
+
+Client should terminate successfully.
+
+Back to the server. It should also terminate successfully and report
+the measured throughput.
+
+invalid_secret_count=0
+time_start=226168.842703565
+utime_start=0.012902
+utime_end=6.683734
+stime_start=0.000983
+stime_end=3.292551
+maxrss_start=5348
+maxrss_end=7376
+minflt_start=671
+minflt_end=1356
+majflt_start=0
+majflt_end=0
+nvcsw_start=5
+nvcsw_end=3551
+nivcsw_start=1
+nivcsw_end=99
+start_index=0
+end_index=9
+num_samples=10
+throughput_Mbps=20551.14
+correlation_coefficient=1.00
+time_end=226178.842706837
+server $
+
+Now reconfigure the loopback so that we can attempt to bind the client
+to another address, that is unexpected by the server:
+
+root # ip addr add 127.0.0.2/8 dev lo
+root # ip addr show lo
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet 127.0.0.2/8 scope host secondary lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host
+       valid_lft forever preferred_lft forever
+
+Re-run the server as before:
+
+server $ ./udp_stream -4 --script ./examples/check-src-addr.lua
+
+Run the client again but this time tell it to bind to secondary
+loopback address:
+
+client $ ./udp_stream -c -L 127.0.0.2
+
+You should see the server complain about the unexpected source address
+and abort:
+
+Wrong source address! Expected 127.0.0.1, but got 127.0.0.2
+server $
