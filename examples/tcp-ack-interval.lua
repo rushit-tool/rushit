@@ -31,8 +31,8 @@ client_socket(
 
 client_recverr(
   function (sockfd, msg, flags)
-    local n = recvmsg(sockfd, msg, flags)
-    assert(n ~= -1)
+    local n, err = recvmsg(sockfd, msg, flags)
+    assert(n, tostring(err))
 
     for _, cmsg in msg:cmsgs() do
       if cmsg.cmsg_level == SOL_SOCKET and
