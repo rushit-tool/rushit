@@ -1,0 +1,76 @@
+Sample script that collects per-socket packet drop count stats.
+
+The drop-count.lua script keeps the count of received packets as well
+as dropped packets for each receiving socket. Once the test has run,
+script reports the counts per socket as well as their total.
+
+First run the UDP stream workload with 4 receiving threads, each one
+listening on its own port.
+
+server $ ./udp_stream -T 4 --script ./examples/drop-count.lua
+VERSION=1.1.0
+all_samples=
+port=12867
+control_port=12866
+host=
+local_host=
+interval=1.000000
+edge_trigger=0
+nonblocking=0
+logtostderr=0
+reuseport=0
+dry_run=0
+client=0
+ipv6=0
+ipv4=0
+suicide_length=0
+buffer_size=16384
+test_length=10
+num_clients=1
+num_threads=4
+num_flows=1
+maxevents=1000
+magic=42
+script=./examples/drop-count.lua
+total_run_time=10
+
+From another terminal, run the client process with the matching number
+of threads:
+
+client $ ./udp_stream -c -F 4 -T 4 --buffer-size 64
+
+Once the test has run, the server process running the script will
+report the received and dropped packet counts:
+
+[... server process output cont'd ...]
+               Received      Dropped
+              (packets)    (packets)
+Thread-01:       612587        26443
+Thread-02:       601991         6224
+Thread-03:       657645        27296
+Thread-04:       614631         6815
+    Total:      2486854        66778
+
+invalid_secret_count=0
+time_start=327650.758210243
+utime_start=0.016462
+utime_end=4.800203
+stime_start=0.009194
+stime_end=4.068251
+maxrss_start=8556
+maxrss_end=18660
+minflt_start=1520
+minflt_end=15108
+majflt_start=0
+majflt_end=0
+nvcsw_start=18
+nvcsw_end=2370363
+nivcsw_start=0
+nivcsw_end=20459
+start_index=0
+end_index=39
+num_samples=40
+throughput_Mbps=137.99
+correlation_coefficient=1.00
+time_end=327660.758255218
+server $

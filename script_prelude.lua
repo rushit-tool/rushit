@@ -1,7 +1,10 @@
 local F = require("ffi")
-local S = require("syscall")
 
--- Mark a local variable for collection by assiging it a special wrapped value.
+-- XXX: Temporary global until we have convenience aliases for all
+--      symbols from ljsyscall.
+S = require("syscall")
+
+-- Mark a local variable for collection by assigning it a special wrapped value.
 --
 -- Collected locals will be assigned a table of values gathered from all worker
 -- Lua states after run() has been called.
@@ -35,9 +38,11 @@ struct addrinfo {
 local C = S.c
 
 AF_INET = C.AF.INET
+AF_INET6 = C.AF.INET6
 -- ...
 
 SOCK_STREAM = C.SOCK.STREAM
+SOCK_DGRAM = C.SOCK.DGRAM
 -- ...
 
 IP_TOS                    = C.IP.TOS
@@ -204,13 +209,23 @@ SOF_TIMESTAMPING_OPT_TX_SWHW  = C.SOF.TIMESTAMPING_OPT_TX_SWHW
 local T = S.types.t
 local PT = S.types.pt
 
+in_addr = T.in_addr
+in6_addr = T.in6_addr
+
 sockaddr_in = T.sockaddr_in
-scm_timestamping = PT.scm_timestamping
+sockaddr_storage = T.sockaddr_storage
+
+uint32_ptr = PT.uint32
+scm_timestamping_ptr = PT.scm_timestamping
 
 --
 -- Functions
 --
 getsockopt = S.getsockopt
+read = S.read
+recv = S.recv
+recvfrom = S.recvfrom
 recvmsg = S.recvmsg
 sendmsg = S.sendmsg
+sendto = S.sendto
 setsockopt = S.setsockopt
