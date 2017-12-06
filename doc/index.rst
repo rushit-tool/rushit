@@ -13,6 +13,7 @@ Welcome to rushit's documentation!
    README
    README.neper
    script-api
+   examples
 
 
 Indices and tables
