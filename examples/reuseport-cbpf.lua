@@ -43,9 +43,11 @@ server_socket(
       sock_filter("RET,A"),                              -- return A
     }
     local prog = sock_fprog1( {{ #code, sock_filters(#code, code) }}) -- Ugh, ugly.
-    assert(prog)
+    assert(prog, "Failed to create sock_fprog")
 
-    assert( setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, true) )
-    assert( setsockopt(sockfd, SOL_SOCKET, SO_ATTACH_REUSEPORT_CBPF, prog, sizeof(prog)) )
+    local ok, err = setsockopt(sockfd, SOL_SOCKET, SO_REUSEPORT, true)
+    assert(ok, tostring(err))
+    local ok, err = setsockopt(sockfd, SOL_SOCKET, SO_ATTACH_REUSEPORT_CBPF, prog, sizeof(prog))
+    assert(ok, tostring(err))
   end
 )

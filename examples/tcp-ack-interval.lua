@@ -21,12 +21,11 @@ local sock_last_ts = {}
 
 client_socket(
   function (sockfd)
-    assert(
-      setsockopt(sockfd, SOL_SOCKET, SO_TIMESTAMPING,
-                 bit.bor(SOF_TIMESTAMPING_SOFTWARE,
-                         SOF_TIMESTAMPING_TX_ACK,
-                         SOF_TIMESTAMPING_OPT_TSONLY))
-    )
+    local ok, err = setsockopt(sockfd, SOL_SOCKET, SO_TIMESTAMPING,
+                               bit.bor(SOF_TIMESTAMPING_SOFTWARE,
+                                       SOF_TIMESTAMPING_TX_ACK,
+                                       SOF_TIMESTAMPING_OPT_TSONLY))
+    assert(ok, tostring(err))
   end
 )
 
