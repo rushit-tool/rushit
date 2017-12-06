@@ -212,7 +212,7 @@ in6_addr = T.in6_addr
 sockaddr_in = T.sockaddr_in
 sockaddr_storage = T.sockaddr_storage
 
-scm_timestamping = PT.scm_timestamping
+scm_timestamping_ptr = PT.scm_timestamping
 
 --
 -- Functions

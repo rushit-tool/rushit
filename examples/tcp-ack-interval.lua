@@ -45,7 +45,7 @@ client_recverr(
         --         struct timespec ts[3];
         -- };
         --
-        local tss = scm_timestamping(cmsg.cmsg_data)
+        local tss = scm_timestamping_ptr(cmsg.cmsg_data)
         local tv = tss.ts[0]
         local ts = (tv.sec * 1000 * 1000)
                  + (tv.nsec / 1000)
