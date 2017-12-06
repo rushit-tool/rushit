@@ -4,7 +4,7 @@ local F = require("ffi")
 --      symbols from ljsyscall.
 S = require("syscall")
 
--- Mark a local variable for collection by assiging it a special wrapped value.
+-- Mark a local variable for collection by assigning it a special wrapped value.
 --
 -- Collected locals will be assigned a table of values gathered from all worker
 -- Lua states after run() has been called.
