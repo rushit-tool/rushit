@@ -221,6 +221,8 @@ scm_timestamping_ptr = PT.scm_timestamping
 -- Functions
 --
 getsockopt = S.getsockopt
+read = S.read
+recv = S.recv
 recvfrom = S.recvfrom
 recvmsg = S.recvmsg
 sendmsg = S.sendmsg
