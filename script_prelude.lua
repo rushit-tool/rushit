@@ -1,5 +1,8 @@
 local F = require("ffi")
-local S = require("syscall")
+
+-- XXX: Temporary global until we have convenience aliases for all
+--      symbols from ljsyscall.
+S = require("syscall")
 
 -- Mark a local variable for collection by assiging it a special wrapped value.
 --
