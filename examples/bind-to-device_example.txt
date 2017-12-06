@@ -1,0 +1,63 @@
+Demonstration of script for setting a socket option to receive packets
+only from a particular interface (SO_BINDTODEVICE).
+
+Set up a veth pair from the current net namespace to a "client" net
+namespace. We will want to receive packets that came in only through
+the veth link from the "client" namespace.
+
+# ip netns add client
+# ip link add type veth peer netns client
+# ip addr add 172.16.1.1/24 dev veth0
+# ip link set dev veth0 up
+# ip netns exec client ip addr add 172.16.1.2/24 dev veth0
+# ip netns exec client ip link set dev veth0 up
+
+Start the server process:
+
+server $ ./udp_stream --script ./examples/bind-to-device.lua
+[...]
+server_socket: lua_pcall: ./examples/bind-to-device.lua:15: Operation not permitted
+
+Binding to a device requires priviliges (CAP_NET_RAW). Redo as a
+priviledged user:
+
+server # ./udp_stream --script ./examples/bind-to-device.lua
+[...]
+port=12867
+[...]
+
+Observe with 'ss' utility that we are listening only on a particual
+interface. (12867 is the default data port.)
+
+$ ss -ln 'sport = 12867'
+Netid  State      Recv-Q Send-Q Local Address:Port                Peer Address:Port
+udp    UNCONN     0      0           ::%veth0:12867                         :::*
+
+Using another terminal run a client process from within the "client"
+net namespace:
+
+client # ip netns exec client ./udp_stream -c -H 172.16.1.1
+
+Notice the server process has received packets and measured the
+throughput:
+
+[... udp_stream server process output ...]
+throughput_Mbps=21362.29
+[...]
+server #
+
+Now restart the server:
+
+server # ./udp_stream --script ./examples/bind-to-device.lua
+
+... and attempt to connect to it over loopback from another terminal.
+Notice the the client process reports errors on write due to the port
+being unreachable.
+
+server $ ./udp_stream -c -H 172.16.1.1 2>&1
+[...]
+write: Connection refused
+write: Connection refused
+write: Connection refused
+[... errors repeat ...]
+server $
