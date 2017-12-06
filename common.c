@@ -277,9 +277,20 @@ ssize_t do_write(struct script_slave *ss, int sockfd, char *buf, size_t len,
 ssize_t do_read(struct script_slave *ss, int sockfd, char *buf, size_t len,
                 int flags)
 {
-        struct iovec iov = { .iov_base = buf, .iov_len = len };
-        struct msghdr msg = { .msg_iov = &iov, .msg_iovlen = 1 };
+        /* XXX: Make cmsg buffer size configurable through opts? */
+        uint8_t cbuf[512];
         ssize_t n;
+
+        struct iovec iov = {
+                .iov_base = buf,
+                .iov_len = len
+        };
+        struct msghdr msg = {
+                .msg_iov = &iov,
+                .msg_iovlen = 1,
+                .msg_control = cbuf,
+                .msg_controllen = ARRAY_SIZE(cbuf),
+        };
 
         n = script_slave_recvmsg_hook(ss, sockfd, &msg, flags);
         if (n == -EHOOKEMPTY)
