@@ -1,0 +1,32 @@
+This is a demonstration of how data can be passed from client/server
+threads to the main thread running the script by marking values for
+collection with `collect()`.
+
+Run a TCP stream server with 5 threads. As socket hook for each of the
+server threads gets invoked they print out their socket descriptor
+number.
+
+server $ ./tcp_stream -T5 --script ./examples/collect-values.lua
+[... output trimmed ...]
+10 11 14 16 18
+
+From another terminal run a TCP stream client with 10 threads. The
+client threads will also print out socket descriptor numbers.
+
+client $ ./tcp_stream -c -l2 -F10 -T10 --script ./examples/collect-values.lua
+[... output trimmed ...]
+17 18 20 24 26 22 28 32 31 34
+
+Wait for the test run to finish. Now both client and server process
+will run the second part of the script which simply prints out again
+the socket descriptors numbers that the threads have been using.
+
+[... client output cont'd ...]
+26 17 20 24 18 28 22 32 34 31
+[... output trimmed ...]
+client $
+
+[... server output cont'd ...]
+16 10 11 14 18
+[... output trimmed ...]
+server $
