@@ -1,4 +1,27 @@
-# neper
+..
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+    Convention for heading levels in documentation:
+
+    =======  Heading 0 (reserved for the title in a document)
+    -------  Heading 1
+    ~~~~~~~  Heading 2
+    +++++++  Heading 3
+    '''''''  Heading 4
+
+=====
+neper
+=====
 
 neper is a Linux networking performance tool.
 
@@ -9,10 +32,10 @@ neper is a Linux networking performance tool.
 
 neper currently supports two workloads:
 
-* `tcp_rr` generates request/response workload (similar to HTTP or RPC) over
+* ``tcp_rr`` generates request/response workload (similar to HTTP or RPC) over
   TCP
-* `tcp_stream` generates bulk data transfer workload (similar to FTP or `scp`)
-  over TCP
+* ``tcp_stream`` generates bulk data transfer workload (similar to FTP or
+  ``scp``) over TCP
 
 neper as a small code base with clean coding style and structure, and is
 easy to extend with new workloads and/or new options.  It can also be embedded
@@ -20,18 +43,19 @@ as a library in a larger application to generate epoll-based workloads.
 
 Disclaimer: This is not an official Google product.
 
-## Basic usage
+Basic usage
+-----------
 
 neper is intended to be used between two machines.  On each machine, the
-neper process (e.g. `tcp_rr` or `tcp_stream`) spawns T threads (workers),
+neper process (e.g. ``tcp_rr`` or ``tcp_stream``) spawns T threads (workers),
 creates F flows (e.g. TCP connections), and multiplexes the F flows evenly over
 the T threads.  Each thread has a epoll set to manage multiple flows.  Each
 flow keeps its own state to make sure the expected workload is generated.
 
 For ease of explanation, we refer to the two machines as the server and the
 client.  The server is the process which binds to an endpoint, while the client
-is the process which connects to the server.  The ordering of `bind()` and
-`connect()` invocations is insignificant, as neper ensures the two processes
+is the process which connects to the server.  The ordering of ``bind()`` and
+``connect()`` invocations is insignificant, as neper ensures the two processes
 are synchronized properly.
 
 When launching the client process, we can specify the number of seconds to
@@ -40,9 +64,10 @@ server to stop and exit.  To run the test again, we have to restart both the
 client and the server.  This is different from netperf, and hopefully should
 make individual tests more independent from each other.
 
-### `tcp_rr`
+``tcp_rr``
+~~~~~~~~~~
 
-Let's start the server process first:
+Let's start the server process first::
 
     server$ tcp_rr
     percentiles=
@@ -66,34 +91,34 @@ Let's start the server process first:
     total_run_time=10
     *(process waiting here)*
 
-Immediately after the process starts, it prints several `key=value` pairs to
+Immediately after the process starts, it prints several ``key=value`` pairs to
 stdout.  They are the command-line option values perceived by neper.  In
 this case, they are all default values.  We can use them to verify the options
 are parsed correctly, or to reproduce the test procedure from persisted
 outputs.
 
 At this point, the server is waiting for a client to connect.  We can continue
-by running
+by running ::
 
     client$ tcp_rr -c -H server
     *(options key-value pairs omitted)*
 
-`-c` is short for `--client` which means "this is the client process".  If `-c`
-is not specified, it will be started as a server and call `bind()`.  When `-c`
-is specified, it will try to `connect()`, and `-H` (short for `--host`)
-specifies the server hostname to connect to.  We can also use IP address
-directly, to avoid resolving hostnames (e.g. through DNS).
+``-c`` is short for ``--client`` which means "this is the client process".  If
+``-c`` is not specified, it will be started as a server and call ``bind()``.
+When ``-c`` is specified, it will try to ``connect()``, and ``-H`` (short for
+``--host``) specifies the server hostname to connect to.  We can also use IP
+address directly, to avoid resolving hostnames (e.g. through DNS).
 
-For both `bind()` and `connect()`, we actually need the port number as well.
-In the case of neper, two ports are being used, one for control plane, the
-other one for data plane.  Default ports are 12866 for control plane and 12867
-for data plane.  They can be overridden by `-C` (short for `--control-port`)
-and `-P` (short for `--port`), respectively.  Default port numbers are chosen
-so that they don't collide with the port 12865 used by netperf.
+For both ``bind()`` and ``connect()``, we actually need the port number as well.
+In the case of neper, two ports are being used, one for control plane, the other
+one for data plane.  Default ports are 12866 for control plane and 12867 for
+data plane.  They can be overridden by ``-C`` (short for ``--control-port``) and
+``-P`` (short for ``--port``), respectively.  Default port numbers are chosen so
+that they don't collide with the port 12865 used by netperf.
 
 Immediately after the client process prints the options, it will connect to the
 server and start sending packets.  After a period of time (by default 10
-seconds), both processes print statistics summary to stdout and then exit:
+seconds), both processes print statistics summary to stdout and then exit::
 
     server$ tcp_rr
     *(previous output omitted)*
@@ -125,14 +150,14 @@ seconds), both processes print statistics summary to stdout and then exit:
     *(previous output omitted)*
     *(new output lines are similar to the server)*
 
-From the line `throughput=33009.84`, we know this test run finished 33009.84
+From the line ``throughput=33009.84``, we know this test run finished 33009.84
 request/response "ping-pong" transactions per second.  A transaction for the
 client means sending a request and then receiving a response.  A transaction
 for the server means receiving a request and then sending a response.  The
 number in this example is very high because it was run on localhost.
 
 To look closer, let's reexamine the test parameters (command-line options),
-most importantly:
+most importantly::
 
     response_size=1
     request_size=1
@@ -144,21 +169,22 @@ That means we were using one thread (on each side) with one flow (TCP
 connection between server and client) to send one-byte requests and responses
 over 10 seconds.
 
-To run the test with 10 flows and two threads, we can instead use
+To run the test with 10 flows and two threads, we can instead use ::
 
     server$ tcp_rr -F 10 -T 2
     client$ tcp_rr -c -H server -F 10 -T 2
 
-where `-F` is short for `--num-flows` and `-T` is short for `--num-threads`.
+where ``-F`` is short for ``--num-flows`` and ``-T`` is short for
+``--num-threads``.
 
 That will be 10 flows multiplexed on top of two threads, so normally it's 5
-flows per thread.  neper uses `SO_REUSEPORT` to load balance among the
+flows per thread.  neper uses ``SO_REUSEPORT`` to load balance among the
 threads, so it might not be exactly 5 flows per thread (e.g. may be 4 + 6).
 This behavior might change in the future.
 
 Server and client do not need to use the same number of threads.  For example,
 we can create 2 threads on the server to serve requests from 4 threads from the
-client.
+client. ::
 
     server$ tcp_rr -F 10 -T 2
     client$ tcp_rr -c -H server -F 10 -T 4
@@ -169,39 +195,43 @@ flows respectively.
 Also note that we have to specify the number of flows on the server side.  This
 behavior might change in the future.
 
-### `tcp_stream`
+``tcp_stream``
+~~~~~~~~~~~~~~
 
-`tcp_stream` shares most of the command-line options with `tcp_rr`.  They
-differ in the output since for a bulk data transfer test like `tcp_stream`, we
+``tcp_stream`` shares most of the command-line options with ``tcp_rr``.  They
+differ in the output since for a bulk data transfer test like ``tcp_stream``, we
 care about the throughput in Mbps rather than in number of transactions.
 
 By default, it's the client sending data to the server.  We can enable the
 other direction of data transfer (from server to client) by specifying
-command-line options `-r` (short for `--enable-read`) and `-w` (short for
-`--enable-write`).
+command-line options ``-r`` (short for ``--enable-read``) and ``-w`` (short for
+``--enable-write``). ::
 
     server$ tcp_stream -w
     client$ tcp_stream -c -H server -r
 
-This is equivalent to
+This is equivalent to ::
 
     server$ tcp_stream -rw
     client$ tcp_stream -c -H server -rw
 
-since `-w` is auto-enabled for `-c`, and `-r` is auto-enabled when `-c` is
-missing.
+since ``-w`` is auto-enabled for ``-c``, and ``-r`` is auto-enabled when ``-c``
+is missing.
 
 In both cases, the flows have bidirectional bulk data transfer.  Previously,
-netperf users may emulate this behavior with `TCP_STREAM` and `TCP_MAERTS`, at
-the cost of doubling the number of netperf processes.
+netperf users may emulate this behavior with ``TCP_STREAM`` and ``TCP_MAERTS``,
+at the cost of doubling the number of netperf processes.
 
-Note that we don't have netperf `TCP_MAERTS` in neper, as you can always
-choose where to specify the `-c` option.  The usage model is basically
+Note that we don't have netperf ``TCP_MAERTS`` in neper, as you can always
+choose where to specify the ``-c`` option.  The usage model is basically
 different, as we don't have a daemon (like netserver) either.
 
-## Options
+Options
+-------
 
-### Connectivity options
+Connectivity options
+~~~~~~~~~~~~~~~~~~~~
+::
 
     client
     host
@@ -209,7 +239,9 @@ different, as we don't have a daemon (like netserver) either.
     control_port
     port
 
-### Workload options
+Workload options
+~~~~~~~~~~~~~~~~
+::
 
     maxevents
     num_flows
@@ -220,26 +252,32 @@ different, as we don't have a daemon (like netserver) either.
     logtostderr
     nonblocking
 
-### Statistics options
+Statistics options
+~~~~~~~~~~~~~~~~~~
+::
 
     all_samples
     interval
 
-### TCP options
+TCP options
+~~~~~~~~~~~
+::
 
     max_pacing_rate
     min_rto
     listen_backlog
 
-### `tcp_rr` options
+``tcp_rr`` options
+~~~~~~~~~~~~~~~~~~
+::
 
     request_size
     response_size
     buffer_size
     percentiles
 
-The output is only available in the detailed form (`samples.csv`) but not in
-the stdout summary.
+The output is only available in the detailed form (``samples.csv``) but not in
+the stdout summary. ::
 
     server$ ./tcp_rr
     client$ ./tcp_rr -c -H server -A --percentiles=25,50,90,95,99
@@ -256,7 +294,9 @@ the stdout summary.
     2766304.649131298,0,0,302011,302011,0.000019,0.000030,0.004476,0.000049,0.000025,0.000029,0.000032,0.000033,0.000044,0.253141,4.294832,5288,608,0,270468,32944
     2766305.649132278,0,0,340838,340838,0.000015,0.000025,0.000220,0.000006,0.000022,0.000025,0.000031,0.000033,0.000035,0.284624,4.808422,5288,685,0,308307,34005
 
-### `tcp_stream` options
+``tcp_stream`` options
+~~~~~~~~~~~~~~~~~~~~~~
+::
 
     reuseaddr
     enable_read
@@ -265,12 +305,15 @@ the stdout summary.
     delay
     buffer_size
 
-## Output format
+Output format
+-------------
 
 When consuming the key-value pairs in the output, the order of the keys should
 be insignificant.  However, the keys are case sensitive.
 
-### Standard output keys
+Standard output keys
+~~~~~~~~~~~~~~~~~~~~
+::
 
     total_run_time # expected time to finish, useful when combined with --dry-run
     invalid_secret_count
@@ -295,19 +338,24 @@ be insignificant.  However, the keys are case sensitive.
     nivcsw_start
     nivcsw_end
 
-#### `tcp_rr`
+``tcp_rr``
+~~~~~~~~~~
+::
 
     num_transactions
     throughput
     correlation_coefficient # for throughput
 
-#### `tcp_stream`
+``tcp_stream``
+~~~~~~~~~~~~~~
+::
 
     num_transactions
     throughput_Mbps
     correlation_coefficient # for throughput_Mbps
 
-## Contribution guidelines
+Contribution guidelines
+-----------------------
 
 * C99, avoid compiler-specific extensions.
 * No external dependency.
