@@ -50,7 +50,7 @@ static void print(void *logger, const char *key, const char *value_fmt, ...)
  *     <program name>.<hostname>.<user name>.<date>-<time>.<pid>.log
  * in the current working directory.
  */
-static void open_log(void)
+static bool open_log(void)
 {
         char *hostname, *user_name, path[1024];
         struct utsname un;
@@ -74,6 +74,7 @@ static void open_log(void)
         if (log_file)
                 fclose(log_file);
         log_file = fopen(path, "w");
+        return log_file;
 }
 
 static void close_log(void)
@@ -110,8 +111,12 @@ static void logging(const char *file, int line, const char *func,
         struct timespec ts;
         struct tm tm;
 
-        if (!log_file)
+        /* create the log file on demand on firt log message, and fail silently
+         * if the file can't be created
+         */
+        if (!log_file && !g_logtostderr && !open_log())
                 return;
+
         size = vsnprintf(buf, sizeof(buf), fmt, argp);
         if (size > sizeof(buf)) {
                 msg = malloc(size);
@@ -203,7 +208,6 @@ static void logtostderr(void *logger)
 
 void logging_init(struct callbacks *cb)
 {
-        open_log();
         cb->logger = NULL;
         cb->print = print;
         cb->log_fatal = log_fatal;
