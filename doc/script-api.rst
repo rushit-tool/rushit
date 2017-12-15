@@ -25,6 +25,8 @@
 
 .. highlight:: lua
 
+.. _script-api:
+
 ==========
 Script API
 ==========
