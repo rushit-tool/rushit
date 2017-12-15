@@ -1,4 +1,4 @@
-%define rushit_version 0.1
+%define rushit_version 0.2
 
 Name:		rushit
 Version:	%{rushit_version}
@@ -27,13 +27,17 @@ make %{?_smp_mflags}
 # explicitly create the full paths here
 mkdir -p $RPM_BUILD_ROOT/%{_bindir}/    \
     $RPM_BUILD_ROOT/%{_datadir}/rushit/ \
-    $RPM_BUILD_ROOT/%{_docdir}/rushit/
+    $RPM_BUILD_ROOT/%{_docdir}/rushit/examples
+
 install -p -t $RPM_BUILD_ROOT/%{_bindir}/ tcp_stream tcp_rr udp_stream
 install -p -m 0644 -t $RPM_BUILD_ROOT/%{_datadir}/rushit/ scripts/*.lua
-install -p -m 0644 -t $RPM_BUILD_ROOT/%{_docdir}/rushit/ README.md README.neper.md
+install -p -m 0644 -t $RPM_BUILD_ROOT/%{_docdir}/rushit/ \
+    doc/README.neper.rst  doc/README.rst  doc/script-api.rst
+install -p -m 0644 -t $RPM_BUILD_ROOT/%{_docdir}/rushit/examples/ \
+    doc/examples/*
 
 %files
 %defattr(-,root,root)
 %{_bindir}/*
 %{_datadir}/rushit/*.lua
-%{_docdir}/rushit/README*
+%{_docdir}/rushit/*
