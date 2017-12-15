@@ -19,6 +19,8 @@
     +++++++  Heading 3
     '''''''  Heading 4
 
+.. _script-examples:
+
 ===============
 Script Examples
 ===============
