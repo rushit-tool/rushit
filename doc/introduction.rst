@@ -19,35 +19,17 @@
     +++++++  Heading 3
     '''''''  Heading 4
 
-=====
-neper
-=====
+.. _introduction:
 
-neper is a Linux networking performance tool.
-
-* Support multithreads and multi-flows out of the box.
-* Generate workload with epoll.
-* Collect statistics in a more accurate way.
-* Export statistics to CSV for easier consumption by other tools.
-
-neper currently supports two workloads:
-
-* ``tcp_rr`` generates request/response workload (similar to HTTP or RPC) over
-  TCP
-* ``tcp_stream`` generates bulk data transfer workload (similar to FTP or
-  ``scp``) over TCP
-
-neper as a small code base with clean coding style and structure, and is
-easy to extend with new workloads and/or new options.  It can also be embedded
-as a library in a larger application to generate epoll-based workloads.
-
-Disclaimer: This is not an official Google product.
+============
+Introduction
+============
 
 Basic usage
 -----------
 
-neper is intended to be used between two machines.  On each machine, the
-neper process (e.g. ``tcp_rr`` or ``tcp_stream``) spawns T threads (workers),
+``rushit`` is intended to be used between two machines. On each machine, the
+``rushit`` process (e.g. ``tcp_rr`` or ``tcp_stream``) spawns T threads (workers),
 creates F flows (e.g. TCP connections), and multiplexes the F flows evenly over
 the T threads.  Each thread has a epoll set to manage multiple flows.  Each
 flow keeps its own state to make sure the expected workload is generated.
@@ -92,7 +74,7 @@ Let's start the server process first::
     *(process waiting here)*
 
 Immediately after the process starts, it prints several ``key=value`` pairs to
-stdout.  They are the command-line option values perceived by neper.  In
+stdout.  They are the command-line option values perceived by ``rushit``.  In
 this case, they are all default values.  We can use them to verify the options
 are parsed correctly, or to reproduce the test procedure from persisted
 outputs.
@@ -110,7 +92,7 @@ When ``-c`` is specified, it will try to ``connect()``, and ``-H`` (short for
 address directly, to avoid resolving hostnames (e.g. through DNS).
 
 For both ``bind()`` and ``connect()``, we actually need the port number as well.
-In the case of neper, two ports are being used, one for control plane, the other
+In the case of ``rushit``, two ports are being used, one for control plane, the other
 one for data plane.  Default ports are 12866 for control plane and 12867 for
 data plane.  They can be overridden by ``-C`` (short for ``--control-port``) and
 ``-P`` (short for ``--port``), respectively.  Default port numbers are chosen so
@@ -178,7 +160,7 @@ where ``-F`` is short for ``--num-flows`` and ``-T`` is short for
 ``--num-threads``.
 
 That will be 10 flows multiplexed on top of two threads, so normally it's 5
-flows per thread.  neper uses ``SO_REUSEPORT`` to load balance among the
+flows per thread.  ``rushit`` uses ``SO_REUSEPORT`` to load balance among the
 threads, so it might not be exactly 5 flows per thread (e.g. may be 4 + 6).
 This behavior might change in the future.
 
@@ -222,8 +204,8 @@ In both cases, the flows have bidirectional bulk data transfer.  Previously,
 netperf users may emulate this behavior with ``TCP_STREAM`` and ``TCP_MAERTS``,
 at the cost of doubling the number of netperf processes.
 
-Note that we don't have netperf ``TCP_MAERTS`` in neper, as you can always
-choose where to specify the ``-c`` option.  The usage model is basically
+Note that we don't have netperf ``TCP_MAERTS`` in ``rushit``, as you can always
+choose where to specify the ``-c`` option. The usage model is basically
 different, as we don't have a daemon (like netserver) either.
 
 Options
@@ -353,10 +335,3 @@ Standard output keys
     num_transactions
     throughput_Mbps
     correlation_coefficient # for throughput_Mbps
-
-Contribution guidelines
------------------------
-
-* C99, avoid compiler-specific extensions.
-* No external dependency.
-* Linux coding style, with tabs expanded to 8 spaces.

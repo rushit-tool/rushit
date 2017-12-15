@@ -11,7 +11,7 @@ Welcome to rushit's documentation!
    :caption: Contents:
 
    README
-   README.neper
+   introduction
    script-api
    examples
 
