@@ -218,14 +218,38 @@ sockaddr_storage = T.sockaddr_storage
 uint32_ptr = PT.uint32
 scm_timestamping_ptr = PT.scm_timestamping
 
---
--- Functions
---
-getsockopt = S.getsockopt
-read = S.read
-recv = S.recv
-recvfrom = S.recvfrom
-recvmsg = S.recvmsg
-sendmsg = S.sendmsg
-sendto = S.sendto
-setsockopt = S.setsockopt
+-- Returns a list of (name, function) pairs, sorted by function name, with all
+-- system calls (functions) wrapped by ljsyscall.
+local function get_sys_funcs(sys)
+  local funcs = {}
+
+  for name, func in pairs(sys) do
+    if type(func) == "function" then
+      table.insert(funcs, { name = name, value = func })
+    end
+  end
+
+  table.sort(funcs, function (f1, f2) return f1.name < f2.name end)
+  return funcs
+end
+
+-- Pull in all (name, value) pairs into a global namespace
+local function import(syms)
+  for _, s in pairs(syms) do
+    _G[s.name] = s.value
+  end
+end
+
+local sys_funcs = get_sys_funcs(S)
+
+import(sys_funcs)
+
+local function list_syms(syms)
+  for _, s in ipairs(syms) do
+    print(s.name)
+  end
+end
+
+function list_sys_funcs()
+  list_syms(sys_funcs)
+end
