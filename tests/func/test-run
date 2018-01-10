@@ -20,20 +20,20 @@ shift
 	exit 1
 }
 
-server_opts=
+declare -a server_opts=()
 while (( $# )); do
 	case $1 in
 	--) shift; break ;;
-	*) server_opts="${server_opts} $1" ;;
+	*) server_opts=("${server_opts[@]}" "$1") ;;
 	esac
 	shift
 done
 
-client_opts=
+declare -a client_opts=()
 while (( $# )); do
 	case $1 in
 	--) shift; break ;;
-	*) client_opts="${client_opts} $1" ;;
+	*) client_opts=("${client_opts[@]}" "$1") ;;
 	esac
 	shift
 done
@@ -42,12 +42,12 @@ done
 # Run workload
 #
 
-echo 2>&1 "* Running server: ${workload} ${server_opts}"
-${workload} ${server_opts} > /dev/null &
+echo 2>&1 "* Running server: ${workload} ${server_opts[@]}"
+${workload} "${server_opts[@]}" > /dev/null &
 server_pid=$!
 
-echo 2>&1 "* Running client: ${workload} --client ${client_opts}"
-${workload} --client ${client_opts} > /dev/null &
+echo 2>&1 "* Running client: ${workload} --client ${client_opts[@]}"
+${workload} --client "${client_opts[@]}" > /dev/null &
 client_pid=$!
 
 wait ${client_pid} ${server_pid}
