@@ -75,6 +75,10 @@ write_again:
                                 continue;
                         }
 
+                        flow->bytes_read += num_bytes;
+                        flow->transactions++;
+                        interval_collect(flow, t);
+
                         if (opts->edge_trigger)
                                 goto write_again;
                 }
