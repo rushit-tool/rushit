@@ -32,7 +32,7 @@ mkdir -p $RPM_BUILD_ROOT/%{_bindir}/    \
 install -p -t $RPM_BUILD_ROOT/%{_bindir}/ tcp_stream tcp_rr udp_stream
 install -p -m 0644 -t $RPM_BUILD_ROOT/%{_datadir}/rushit/ scripts/*.lua
 install -p -m 0644 -t $RPM_BUILD_ROOT/%{_docdir}/rushit/ \
-    doc/README.neper.rst  doc/README.rst  doc/script-api.rst
+    doc/README.rst  doc/script-api.rst doc/introduction.rst
 install -p -m 0644 -t $RPM_BUILD_ROOT/%{_docdir}/rushit/examples/ \
     doc/examples/*
 
