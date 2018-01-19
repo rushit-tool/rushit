@@ -2,7 +2,7 @@
 
 Name:		rushit
 Version:	%{rushit_version}
-Release:	1%{?dist}
+Release:	2%{?dist}
 Summary:	scriptable performance tool
 
 Group:		Applications/Internet
