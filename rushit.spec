@@ -1,8 +1,8 @@
-%define rushit_version 0.2
+%define rushit_version 0.3
 
 Name:		rushit
 Version:	%{rushit_version}
-Release:	2%{?dist}
+Release:	1%{?dist}
 Summary:	scriptable performance tool
 
 Group:		Applications/Internet

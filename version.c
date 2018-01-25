@@ -17,8 +17,8 @@
 #include "version.h"
 #include <stdio.h>
 
-#define MAJOR 1
-#define MINOR 1
+#define MAJOR 0
+#define MINOR 3
 #define PATCH 0
 
 #define AS_STRING2(x) #x
