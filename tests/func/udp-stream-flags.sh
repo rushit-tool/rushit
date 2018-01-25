@@ -6,7 +6,7 @@
 
 set -o errexit
 
-basedir="$(dirname "$0")"
+basedir=$(dirname "$0")
 topdir="${basedir}/../.."
 
 PATH="${basedir}:${topdir}"
