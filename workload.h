@@ -21,10 +21,16 @@
  * Logic shared by all workloads.
  */
 
+#include <sys/socket.h>
 #include <stdint.h>
 
 
+struct addrinfo;
 struct epoll_event;
+
+struct callbacks;
+struct options;
+struct thread;
 
 /* Set of all possible socket operations. open() is mandatory, rest is optional. */
 struct socket_ops {
