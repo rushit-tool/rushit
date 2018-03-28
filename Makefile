@@ -43,7 +43,7 @@ top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 staging-dir := $(top-dir)/staging
 
 # Packaging related - the version number is specified only inside the spec file
-VERSION		:= $(shell awk '/%define rushit_version /{print $$NF}' rushit.spec)
+VERSION		:= $(shell awk '/%define rushit_version /{print $$NF}' $(top-dir)/rushit.spec)
 DIST_ARCHIVES	:= rushit-$(VERSION).tar.gz
 RPMBUILD_TOP	:= ${top-dir}/rpm/
 
@@ -84,6 +84,13 @@ udp_stream-objs := udp_stream_main.o udp_stream.o
 
 binaries := tcp_rr tcp_stream dummy_test udp_stream
 
+# Use absolute paths to allow launching make out of top level dir
+base-objs := $(addprefix $(top-dir)/,$(base-objs))
+tcp_rr-objs := $(addprefix $(top-dir)/,$(tcp_rr-objs))
+tcp_stream-objs := $(addprefix $(top-dir)/,$(tcp_stream-objs))
+dummy_test-objs := $(addprefix $(top-dir)/,$(dummy_test-objs))
+udp_stream-objs := $(addprefix $(top-dir)/,$(udp_stream-objs))
+
 default: all
 
 # avoid dep geneation on clean targets
@@ -100,7 +107,7 @@ endif
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
 
 %.o: %.lua
-	$(luajit-exe) -b -t o -n $(basename $<) $< $@
+	$(luajit-exe) -b -t o -n $(notdir $<) $< $@
 
 %.d: %.c
 	@$(CC) -M $(ALL_CPPFLAGS) $< | \
