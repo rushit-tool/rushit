@@ -10,6 +10,7 @@ udp_stream
 
 # Tests
 t_script
+t_stats
 
 # Run artifacts
 *.log
