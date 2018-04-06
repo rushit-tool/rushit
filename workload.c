@@ -320,8 +320,9 @@ void run_server(struct thread *t, const struct socket_ops *ops,
 
 void report_stream_stats(struct thread *tinfo)
 {
+        CLEANUP(free) struct sample *samples = NULL;
         struct timespec *start_time;
-        struct sample *p, *samples;
+        struct sample *p;
         int num_samples, i, j, tid, flow_id, start_index, end_index;
         ssize_t start_total, current_total, **per_flow;
         double duration, total_bytes, throughput, correlation_coefficient,
@@ -390,5 +391,4 @@ void report_stream_stats(struct thread *tinfo)
         free(per_flow);
         PRINT(cb, "time_end", "%ld.%09ld", samples[num_samples-1].timestamp.tv_sec,
               samples[num_samples-1].timestamp.tv_nsec);
-        free(samples);
 }
