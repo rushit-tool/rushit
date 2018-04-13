@@ -27,13 +27,13 @@ struct numlist;
 struct percentiles;
 
 struct sample {
-        int tid;
-        int flow_id;
-        ssize_t bytes_read;
-        unsigned long transactions;
-        struct numlist *latency;
-        struct timespec timestamp;
-        struct rusage rusage;
+        int tid;                    /* Thread identifier. */
+        int flow_id;                /* Flow (connection) identifier. */
+        ssize_t bytes_read;         /* Count of bytes read (client only). */
+        unsigned long transactions; /* Count of reads (client) or writes (server). */
+        struct numlist *latency;    /* Time from write to read for each transaction. */
+        struct timespec timestamp;  /* When sample was collected. */
+        struct rusage rusage;       /* RUSAGE_THREAD stats at time of collection. */
         struct sample *next;
 };
 
