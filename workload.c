@@ -27,6 +27,14 @@
 #include "workload.h"
 
 
+struct stats {
+        int num_samples;
+        double throughput;
+        double correlation_coefficient;
+        struct timespec end_time;
+};
+
+
 static int tcp_socket_open(const struct addrinfo *hints)
 {
         return socket(hints->ai_family, SOCK_STREAM, IPPROTO_TCP);
@@ -318,58 +326,75 @@ void run_server(struct thread *t, const struct socket_ops *ops,
         do_close(epfd);
 }
 
-void report_stream_stats(struct thread *tinfo)
+static void collect_samples(const struct thread *threads, int num_threads,
+                              struct sample **samples_p, int *num_samples_p)
 {
-        CLEANUP(free) struct sample *samples = NULL;
-        struct timespec *start_time;
-        struct sample *p;
-        int num_samples, i, j, tid, flow_id, start_index, end_index;
-        ssize_t start_total, current_total, **per_flow;
-        double duration, total_bytes, throughput, correlation_coefficient,
-               sum_xy = 0, sum_xx = 0, sum_yy = 0;
-        struct options *opts = tinfo[0].opts;
-        struct callbacks *cb = tinfo[0].cb;
+        struct sample *samples;
+        struct sample *s;
+        int num_samples;
+        int i, j;
 
         num_samples = 0;
-        for (i = 0; i < opts->num_threads; i++)
-                for (p = tinfo[i].samples; p; p = p->next)
+        for (i = 0; i < num_threads; i++) {
+                LIST_FOR_EACH(threads[i].samples, s)
                         num_samples++;
-        if (num_samples == 0) {
-                LOG_WARN(cb, "no sample collected");
-                return;
         }
-        samples = calloc(num_samples, sizeof(struct sample));
-        j = 0;
-        for (i = 0; i < opts->num_threads; i++)
-                for (p = tinfo[i].samples; p; p = p->next)
-                        samples[j++] = *p;
-        qsort(samples, num_samples, sizeof(samples[0]), compare_samples);
-        if (opts->all_samples)
-                print_samples(0, samples, num_samples, opts->all_samples, cb);
+
+        samples = calloc(num_samples, sizeof(*samples));
+        for (i = 0, j = 0; i < num_threads; i++) {
+                LIST_FOR_EACH(threads[i].samples, s)
+                        samples[j++] = *s;
+        }
+        qsort(samples, num_samples, sizeof(*samples), compare_samples);
+
+        *samples_p = samples;
+        *num_samples_p = num_samples;
+}
+
+static void calculate_stream_stats(const struct thread *threads, int num_threads,
+                                   const struct sample *samples, int num_samples,
+                                   struct stats *stats)
+{
+        CLEANUP(free) ssize_t **per_flow = NULL;
+        const struct timespec *start_time, *end_time;
+        ssize_t start_total, current_total;
+        int start_index, end_index;
+        double duration;
+        double total_bytes;
+        double throughput;
+        double correlation_coefficient;
+        double sum_xy, sum_xx, sum_yy;
+        struct sample *s;
+        int flow_id;
+        int tid;
+        int i, j;
+
         start_index = 0;
         end_index = num_samples - 1;
-        PRINT(cb, "start_index", "%d", start_index);
-        PRINT(cb, "end_index", "%d", end_index);
-        PRINT(cb, "num_samples", "%d", num_samples);
-        if (start_index >= end_index) {
-                LOG_WARN(cb, "insufficient number of samples");
-                return;
-        }
+
         start_time = &samples[start_index].timestamp;
+        end_time = &samples[end_index].timestamp;
+
+        per_flow = calloc(num_threads, sizeof(*per_flow));
+        for (i = 0; i < num_threads; i++) {
+                int max_flow_id = 0;
+                LIST_FOR_EACH(threads[i].samples, s) {
+                        if (s->flow_id > max_flow_id)
+                                max_flow_id = s->flow_id;
+                }
+                per_flow[i] = calloc(max_flow_id + 1, sizeof(*per_flow[i]));
+        }
+
         start_total = samples[start_index].bytes_read;
         current_total = start_total;
-        per_flow = calloc(opts->num_threads, sizeof(ssize_t *));
-        for (i = 0; i < opts->num_threads; i++) {
-                int max_flow_id = 0;
-                for (p = tinfo[i].samples; p; p = p->next) {
-                        if (p->flow_id > max_flow_id)
-                                max_flow_id = p->flow_id;
-                }
-                per_flow[i] = calloc(max_flow_id + 1, sizeof(ssize_t));
-        }
+
         tid = samples[start_index].tid;
         flow_id = samples[start_index].flow_id;
         per_flow[tid][flow_id] = start_total;
+
+        duration = 0.0;
+        total_bytes = 0.0;
+        sum_xy = sum_xx = sum_yy = 0.0;
         for (j = start_index + 1; j <= end_index; j++) {
                 tid = samples[j].tid;
                 flow_id = samples[j].flow_id;
@@ -382,13 +407,59 @@ void report_stream_stats(struct thread *tinfo)
                 sum_xx += duration * duration;
                 sum_yy += total_bytes * total_bytes;
         }
-        throughput = total_bytes / duration;
-        correlation_coefficient = sum_xy / sqrt(sum_xx * sum_yy);
-        PRINT(cb, "throughput_Mbps", "%.2f", throughput * 8 / 1e6);
-        PRINT(cb, "correlation_coefficient", "%.2f", correlation_coefficient);
-        for (i = 0; i < opts->num_threads; i++)
+        if (duration == 0.0 || total_bytes == 0.0) {
+                throughput = 0.0;
+                correlation_coefficient = 0.0;
+        } else {
+                throughput = total_bytes / duration;
+                correlation_coefficient = sum_xy / sqrt(sum_xx * sum_yy);
+        }
+
+        stats->num_samples = num_samples;
+        stats->throughput = throughput;
+        stats->correlation_coefficient = correlation_coefficient;
+        stats->end_time = *end_time;
+
+        for (i = 0; i < num_threads; i++)
                 free(per_flow[i]);
-        free(per_flow);
-        PRINT(cb, "time_end", "%ld.%09ld", samples[num_samples-1].timestamp.tv_sec,
-              samples[num_samples-1].timestamp.tv_nsec);
+}
+
+static void print_stream_stats(const struct callbacks *cb,
+                               const struct stats *stats)
+{
+        PRINT(cb, "num_samples", "%d", stats->num_samples);
+        PRINT(cb, "throughput_Mbps", "%.2f", stats->throughput * 8 / 1e6);
+        PRINT(cb, "correlation_coefficient", "%.2f",
+              stats->correlation_coefficient);
+        PRINT(cb, "time_end", "%ld.%09ld",
+              stats->end_time.tv_sec, stats->end_time.tv_nsec);
+}
+
+void report_stream_stats(struct thread *threads)
+{
+        CLEANUP(free) struct sample *samples = NULL;
+        struct stats stats = { 0 };
+        struct callbacks *cb;
+        struct options *opts;
+        int num_samples;
+
+        cb = threads[0].cb;
+        opts = threads[0].opts;
+
+        collect_samples(threads, opts->num_threads, &samples, &num_samples);
+        if (num_samples == 0) {
+                LOG_WARN(cb, "no samples collected");
+                return;
+        } else if (num_samples == 1) {
+                LOG_WARN(cb, "insufficient number of samples");
+                /* We will print some stats. */
+        }
+
+        calculate_stream_stats(threads, opts->num_threads, samples, num_samples,
+                               &stats);
+        print_stream_stats(cb, &stats);
+
+        if (opts->all_samples)
+                print_samples(0, samples, num_samples, opts->all_samples, cb);
+
 }

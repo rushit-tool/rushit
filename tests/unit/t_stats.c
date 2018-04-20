@@ -202,9 +202,9 @@ static void t_stream_stats_one_sample(void **state)
 
         report_stream_stats(&thread);
         assert_int_equal(1, stats.num_samples);
-        assert_dbl_equal(NAN, stats.throughput_Mbps);
-        assert_dbl_equal(NAN, stats.correlation_coefficient);
-        assert_tv_equal(&TIMESPEC(-1, -1), &stats.end_time);
+        assert_dbl_equal(0.0, stats.throughput_Mbps);
+        assert_dbl_equal(0.0, stats.correlation_coefficient);
+        assert_tv_equal(&TIMESPEC(0, 0), &stats.end_time);
 }
 
 static void t_stream_stats_one_thread_one_flow_two_samples(void **state)
