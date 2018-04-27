@@ -80,6 +80,11 @@ void run_client(struct thread *t, const struct socket_ops *ops,
 void run_server(struct thread *t, const struct socket_ops *ops,
                 process_events_t process_events);
 
+/* Calculates statistics from samples collected by threads. Optionally, return
+ * the aggregated list of samples that caller needs to free(). */
+void calculate_stream_stats(const struct thread *threads, int num_threads,
+                            struct stats *stats, struct sample **samples_);
+
 /* Calculate and print out statistics for a stream workload */
 void report_stream_stats(struct thread *tinfo);
 

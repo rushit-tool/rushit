@@ -343,8 +343,8 @@ static void collect_samples(const struct thread *threads, int num_threads,
         *num_samples_p = num_samples;
 }
 
-static void calculate_stream_stats(const struct thread *threads, int num_threads,
-                                   struct stats *stats, struct sample **samples_)
+void calculate_stream_stats(const struct thread *threads, int num_threads,
+                            struct stats *stats, struct sample **samples_)
 {
         CLEANUP(free) struct sample *samples = NULL;
         CLEANUP(free) ssize_t **per_flow = NULL;
