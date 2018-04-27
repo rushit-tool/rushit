@@ -95,7 +95,7 @@ static void _assert_dbl_equal(double a, double b,
         if (fabs(a - b) < delta)
                 return;
 
-        print_error("|%f - %f| >= %f", a, b, delta);
+        print_error("|%f - %f| >= %f\n", a, b, delta);
         _fail(file, line);
 }
 #define assert_dbl_equal(a, b) _assert_dbl_equal(a, b, __FILE__, __LINE__)
