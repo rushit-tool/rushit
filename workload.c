@@ -319,7 +319,7 @@ void run_server(struct thread *t, const struct socket_ops *ops,
 }
 
 static void collect_samples(const struct thread *threads, int num_threads,
-                              struct sample **samples_p, int *num_samples_p)
+                            struct sample **samples_p, int *num_samples_p)
 {
         struct sample *samples;
         struct sample *s;
@@ -344,13 +344,14 @@ static void collect_samples(const struct thread *threads, int num_threads,
 }
 
 static void calculate_stream_stats(const struct thread *threads, int num_threads,
-                                   const struct sample *samples, int num_samples,
-                                   struct stats *stats)
+                                   struct stats *stats, struct sample **samples_)
 {
+        CLEANUP(free) struct sample *samples = NULL;
         CLEANUP(free) ssize_t **per_flow = NULL;
         const struct timespec *start_time, *end_time;
         ssize_t start_total, current_total;
         int start_index, end_index;
+        int num_samples = 0;
         double duration;
         double total_bytes;
         double throughput;
@@ -360,6 +361,12 @@ static void calculate_stream_stats(const struct thread *threads, int num_threads
         int flow_id;
         int tid;
         int i, j;
+
+        collect_samples(threads, num_threads, &samples, &num_samples);
+        if (num_samples == 0) {
+                memset(stats, 0, sizeof(*stats));
+                return;
+        }
 
         start_index = 0;
         end_index = num_samples - 1;
@@ -412,6 +419,11 @@ static void calculate_stream_stats(const struct thread *threads, int num_threads
         stats->correlation_coefficient = correlation_coefficient;
         stats->end_time = *end_time;
 
+        if (samples_) {
+                *samples_ = samples;
+                samples = NULL;
+        }
+
         for (i = 0; i < num_threads; i++)
                 free(per_flow[i]);
 }
@@ -419,6 +431,14 @@ static void calculate_stream_stats(const struct thread *threads, int num_threads
 static void print_stream_stats(const struct callbacks *cb,
                                const struct stats *stats)
 {
+        if (stats->num_samples == 0) {
+                LOG_WARN(cb, "no samples collected");
+                return;
+        } else if (stats->num_samples == 1) {
+                LOG_WARN(cb, "insufficient number of samples");
+                /* We will print some stats. */
+        }
+
         PRINT(cb, "num_samples", "%d", stats->num_samples);
         PRINT(cb, "throughput_Mbps", "%.2f", stats->throughput * 8 / 1e6);
         PRINT(cb, "correlation_coefficient", "%.2f",
@@ -431,27 +451,20 @@ void report_stream_stats(struct thread *threads)
 {
         CLEANUP(free) struct sample *samples = NULL;
         struct stats stats = { 0 };
+        struct sample **samples_p;
+        const char *samples_file;
         struct callbacks *cb;
         struct options *opts;
-        int num_samples;
 
         cb = threads[0].cb;
         opts = threads[0].opts;
+        samples_file = opts->all_samples;
 
-        collect_samples(threads, opts->num_threads, &samples, &num_samples);
-        if (num_samples == 0) {
-                LOG_WARN(cb, "no samples collected");
-                return;
-        } else if (num_samples == 1) {
-                LOG_WARN(cb, "insufficient number of samples");
-                /* We will print some stats. */
-        }
-
-        calculate_stream_stats(threads, opts->num_threads, samples, num_samples,
-                               &stats);
+        samples_p = samples_file ? &samples : NULL;
+        calculate_stream_stats(threads, opts->num_threads, &stats, samples_p);
         print_stream_stats(cb, &stats);
 
-        if (opts->all_samples)
-                print_samples(0, samples, num_samples, opts->all_samples, cb);
+        if (samples_file)
+                print_samples(0, samples, stats.num_samples, samples_file, cb);
 
 }
