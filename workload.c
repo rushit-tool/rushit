@@ -27,14 +27,6 @@
 #include "workload.h"
 
 
-struct stats {
-        int num_samples;
-        double throughput;
-        double correlation_coefficient;
-        struct timespec end_time;
-};
-
-
 static int tcp_socket_open(const struct addrinfo *hints)
 {
         return socket(hints->ai_family, SOCK_STREAM, IPPROTO_TCP);

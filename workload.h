@@ -45,6 +45,15 @@ struct socket_ops {
         int (*epoll_wait)(int epfd, struct epoll_event *events, int maxevents, int timeout);
 };
 
+/* Statistics we calculate from a set of samples for stream workloads. */
+struct stats {
+        int num_samples;
+        double throughput;      /* bytes per second */
+        double correlation_coefficient;
+        struct timespec end_time;
+};
+
+
 /* Operations for TCP sockets. */
 extern const struct socket_ops tcp_socket_ops;
 
