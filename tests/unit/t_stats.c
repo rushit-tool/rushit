@@ -49,25 +49,8 @@
                 .end_time = { -1, -1 }                  \
         }
 
-#define FAKE_CALLBACKS(stats)                   \
-        {                                       \
-                .logger = stats,                \
-                .print = mock_log_value,        \
-                .log_fatal = mock_log_msg,      \
-                .log_error = mock_log_msg,      \
-                .log_warn = mock_log_msg,       \
-                .log_info = mock_log_msg,       \
-        }
-
-#define FAKE_OPTIONS(num_threads_)              \
-        {                                       \
-                .num_threads = num_threads_,    \
-        }
-
-#define FAKE_THREAD(callbacks, options, samples_)       \
+#define FAKE_THREAD(samples_)                           \
         {                                               \
-                .cb = callbacks,                        \
-                .opts = options,                        \
                 .samples = samples_,                    \
         }
 
@@ -120,63 +103,20 @@ static void link_samples(struct sample *samples, size_t n_samples)
         samples[i].next = NULL;
 }
 
-static void mock_log_value(void *logger, const char *key, const char *fmt, ...)
-{
-        struct stats *stats = logger;
-        va_list ap;
-
-        va_start(ap, fmt);
-        if (!strcmp(key, "start_index") ||
-            !strcmp(key, "end_index")) {
-                /* Ignored, deprecated. */
-        } else if (!strcmp(key, "num_samples")) {
-                stats->num_samples = va_arg(ap, int);
-        } else if (!strcmp(key, "throughput_Mbps")) {
-                stats->throughput = va_arg(ap, double);
-        } else if (!strcmp(key, "correlation_coefficient")) {
-                stats->correlation_coefficient = va_arg(ap, double);
-        } else if (!strcmp(key, "time_end")) {
-                stats->end_time.tv_sec = va_arg(ap, time_t);
-                stats->end_time.tv_nsec = va_arg(ap, long);
-        } else {
-                fail_msg("Unexpected key '%s'", key);
-        }
-        va_end(ap);
-}
-
-static void mock_log_msg(void *logger, const char *file, int line,
-                         const char *function, const char *fmt, ...)
-{
-        va_list argp;
-
-        UNUSED(logger);
-        UNUSED(file);
-        UNUSED(line);
-        UNUSED(function);
-
-        va_start(argp, fmt);
-        vfprintf(stderr, fmt, argp);
-        va_end(argp);
-        fputc('\n', stderr);
-}
-
-
 static void t_stream_stats_zero_samples(void **state)
 {
         const int num_threads = 1;
         struct sample *samples = NULL;
 
         struct stats stats = INVALID_STATS;
-        struct callbacks cb = FAKE_CALLBACKS(&stats);
-        struct options opts = FAKE_OPTIONS(num_threads);
-        struct thread thread = FAKE_THREAD(&cb, &opts, samples);
+        struct thread thread = FAKE_THREAD(samples);
         UNUSED(state);
 
-        report_stream_stats(&thread);
-        assert_int_equal(-1, stats.num_samples);
-        assert_dbl_equal(NAN, stats.throughput);
-        assert_dbl_equal(NAN, stats.correlation_coefficient);
-        assert_tv_equal(&TIMESPEC(-1, -1), &stats.end_time);
+        calculate_stream_stats(&thread, num_threads, &stats, NULL);
+        assert_int_equal(0, stats.num_samples);
+        assert_dbl_equal(0.0, stats.throughput);
+        assert_dbl_equal(0.0, stats.correlation_coefficient);
+        assert_tv_equal(&TIMESPEC(0, 0), &stats.end_time);
 }
 
 static void t_stream_stats_one_sample(void **state)
@@ -187,12 +127,10 @@ static void t_stream_stats_one_sample(void **state)
         };
 
         struct stats stats = INVALID_STATS;
-        struct callbacks cb = FAKE_CALLBACKS(&stats);
-        struct options opts = FAKE_OPTIONS(num_threads);
-        struct thread thread = FAKE_THREAD(&cb, &opts, samples);
+        struct thread thread = FAKE_THREAD(samples);
         UNUSED(state);
 
-        report_stream_stats(&thread);
+        calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(1, stats.num_samples);
         assert_dbl_equal(0.0, stats.throughput);
         assert_dbl_equal(0.0, stats.correlation_coefficient);
@@ -203,20 +141,18 @@ static void t_stream_stats_one_thread_one_flow_two_samples(void **state)
 {
         const int num_threads = 1;
         struct sample samples[] = {
-                SAMPLE(THREAD_0, FLOW_1, 0, 0),
-                SAMPLE(THREAD_0, FLOW_1, 1, 1000/8 * 1000000),
+                SAMPLE(THREAD_0, FLOW_1, 0, 0),          /* 0 sec, 0 GB */
+                SAMPLE(THREAD_0, FLOW_1, 1, 1000000000), /* 1 sec, 1 GB */
         };
         link_samples(samples, ARRAY_SIZE(samples));
 
         struct stats stats = INVALID_STATS;
-        struct callbacks cb = FAKE_CALLBACKS(&stats);
-        struct options opts = FAKE_OPTIONS(num_threads);
-        struct thread thread = FAKE_THREAD(&cb, &opts, samples);
+        struct thread thread = FAKE_THREAD(samples);
         UNUSED(state);
 
-        report_stream_stats(&thread);
+        calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(2, stats.num_samples);
-        assert_dbl_equal(1000.0, stats.throughput);
+        assert_dbl_equal(1e9, stats.throughput);
         assert_dbl_equal(1.0, stats.correlation_coefficient);
         assert_tv_equal(&TIMESPEC(1, 0), &stats.end_time);
 }
@@ -225,21 +161,19 @@ static void t_stream_stats_one_thread_one_flow_three_samples(void **state)
 {
         const int num_threads = 1;
         struct sample samples[] = {
-                SAMPLE(THREAD_0, FLOW_1, 0, 0),
-                SAMPLE(THREAD_0, FLOW_1, 1, 400/8 * 1000000),
-                SAMPLE(THREAD_0, FLOW_1, 2, 800/8 * 1000000),
+                SAMPLE(THREAD_0, FLOW_1, 0, 0),          /* 0 sec, 0 GB */
+                SAMPLE(THREAD_0, FLOW_1, 1, 1000000000), /* 1 sec, 1 GB */
+                SAMPLE(THREAD_0, FLOW_1, 2, 2000000000), /* 2 sec, 2 GB */
         };
         link_samples(samples, ARRAY_SIZE(samples));
 
         struct stats stats = INVALID_STATS;
-        struct callbacks cb = FAKE_CALLBACKS(&stats);
-        struct options opts = FAKE_OPTIONS(num_threads);
-        struct thread thread = FAKE_THREAD(&cb, &opts, samples);
+        struct thread thread = FAKE_THREAD(samples);
         UNUSED(state);
 
-        report_stream_stats(&thread);
+        calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(3, stats.num_samples);
-        assert_dbl_equal(400.0, stats.throughput);
+        assert_dbl_equal(1e9, stats.throughput);
         assert_dbl_equal(1.0, stats.correlation_coefficient);
         assert_tv_equal(&TIMESPEC(2, 0), &stats.end_time);
 }
@@ -248,22 +182,20 @@ static void t_stream_stats_one_thread_two_flows_four_samples(void **state)
 {
         const int num_threads = 1;
         struct sample samples[] = {
-                SAMPLE(THREAD_0, FLOW_1, 0, 0),
-                SAMPLE(THREAD_0, FLOW_2, 1, 240/8 * 1000000),
-                SAMPLE(THREAD_0, FLOW_1, 2, 480/8 * 1000000),
-                SAMPLE(THREAD_0, FLOW_2, 3, 720/8 * 1000000),
+                SAMPLE(THREAD_0, FLOW_1, 0, 0),          /* 0 sec, 0.0 GB, flow #1 */
+                SAMPLE(THREAD_0, FLOW_2, 1, 1500000000), /* 1 sec, 1.5 GB, flow #2 */
+                SAMPLE(THREAD_0, FLOW_1, 2, 3000000000), /* 2 sec, 3.0 GB, flow #1 */
+                SAMPLE(THREAD_0, FLOW_2, 3, 6000000000), /* 3 sec, 3.0 GB, flow #2 */
         };
         link_samples(samples, ARRAY_SIZE(samples));
 
         struct stats stats = INVALID_STATS;
-        struct callbacks cb = FAKE_CALLBACKS(&stats);
-        struct options opts = FAKE_OPTIONS(num_threads);
-        struct thread thread = FAKE_THREAD(&cb, &opts, samples);
+        struct thread thread = FAKE_THREAD(samples);
         UNUSED(state);
 
-        report_stream_stats(&thread);
+        calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(4, stats.num_samples);
-        assert_dbl_equal(400.0, stats.throughput);
+        assert_dbl_equal(3e9, stats.throughput);
         assert_tv_equal(&TIMESPEC(3, 0), &stats.end_time);
         /*
          * FIXME: Correlation coefficient calculation for multiple flows is
@@ -279,28 +211,26 @@ static void t_stream_stats_two_threads_two_flows_four_samples(void **state)
         const int num_threads = 2;
         struct sample samples[2][2] = {
                 {
-                        SAMPLE(THREAD_0, FLOW_1, 0, 0),
-                        SAMPLE(THREAD_0, FLOW_1, 1, 200/8 * 1000000),
+                        SAMPLE(THREAD_0, FLOW_1, 0, 0),          /* 0 sec, 0 GB */
+                        SAMPLE(THREAD_0, FLOW_1, 1, 1000000000), /* 1 sec, 1 GB */
                 }, {
-                        SAMPLE(THREAD_1, FLOW_1, 0, 0),
-                        SAMPLE(THREAD_1, FLOW_1, 1, 200/8 * 1000000),
+                        SAMPLE(THREAD_1, FLOW_1, 0, 0),          /* 0 sec, 0 GB */
+                        SAMPLE(THREAD_1, FLOW_1, 1, 1000000000), /* 1 sec, 1 GB */
                 },
         };
         link_samples(samples[0], ARRAY_SIZE(samples[0]));
         link_samples(samples[1], ARRAY_SIZE(samples[1]));
 
         struct stats stats = INVALID_STATS;
-        struct callbacks cb = FAKE_CALLBACKS(&stats);
-        struct options opts = FAKE_OPTIONS(num_threads);
         struct thread threads[] = {
-                FAKE_THREAD(&cb, &opts, samples[0]),
-                FAKE_THREAD(&cb, &opts, samples[1]),
+                FAKE_THREAD(samples[0]),
+                FAKE_THREAD(samples[1]),
         };
         UNUSED(state);
 
-        report_stream_stats(threads);
+        calculate_stream_stats(threads, num_threads, &stats, NULL);
         assert_int_equal(4, stats.num_samples);
-        assert_dbl_equal(400.0, stats.throughput);
+        assert_dbl_equal(2e9, stats.throughput);
         assert_tv_equal(&TIMESPEC(1, 0), &stats.end_time);
         /*
          * FIXME: Correlation coefficient calculation for multiple flows is
