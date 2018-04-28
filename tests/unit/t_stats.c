@@ -24,6 +24,7 @@
 #include <cmocka.h>
 #include <float.h>
 #include <math.h>
+#include <time.h>
 
 #include "common.h"
 #include "lib.h"
@@ -32,14 +33,16 @@
 #include "workload.h"
 
 
-#define SAMPLE(thread_id, flow_id_, timestamp_sec, bytes_read_) \
-        {                                                       \
+#define SAMPLE(thread_id, flow_id_, timestamp_, bytes_read_)    \
+        (struct sample) {                                       \
                 .tid = thread_id,                               \
                 .flow_id = flow_id_,                            \
                 .bytes_read = bytes_read_,                      \
-                .timestamp = { .tv_sec = timestamp_sec },       \
+                .timestamp = {                                  \
+                        .tv_sec = (timestamp_)->tv_sec,         \
+                        .tv_nsec = (timestamp_)->tv_nsec,       \
+                },                                              \
         }
-
 
 #define INVALID_STATS                                   \
         {                                               \
@@ -54,7 +57,19 @@
                 .samples = samples_,                    \
         }
 
-#define TIMESPEC(sec, nsec) (struct timespec) { .tv_sec = sec, .tv_nsec = nsec }
+#define TIMESPEC(sec, nsec)                     \
+        (struct timespec) {                     \
+                .tv_sec = sec,                  \
+                .tv_nsec = nsec,                \
+        }
+
+#define TIMESPEC_OFF(t0, t1_sec)                        \
+        (struct timespec) {                             \
+                .tv_sec = (t0)->tv_sec + t1_sec,        \
+                .tv_nsec = (t0)->tv_nsec                \
+        }
+
+
 
 
 enum {
@@ -121,9 +136,14 @@ static void t_stream_stats_zero_samples(void **state)
 
 static void t_stream_stats_one_sample(void **state)
 {
+        const struct timespec *t0 = *state;
         const int num_threads = 1;
+
+        struct timespec *t[] = {
+                &TIMESPEC_OFF(t0, 0),
+        };
         struct sample samples[] = {
-                SAMPLE(THREAD_0, FLOW_1, 0, 0),
+                SAMPLE(THREAD_0, FLOW_1, t[0], 0),
         };
 
         struct stats stats = INVALID_STATS;
@@ -134,15 +154,21 @@ static void t_stream_stats_one_sample(void **state)
         assert_int_equal(1, stats.num_samples);
         assert_dbl_equal(0.0, stats.throughput);
         assert_dbl_equal(0.0, stats.correlation_coefficient);
-        assert_tv_equal(&TIMESPEC(0, 0), &stats.end_time);
+        assert_tv_equal(t[0], &stats.end_time);
 }
 
 static void t_stream_stats_one_thread_one_flow_two_samples(void **state)
 {
+        const struct timespec *t0 = *state;
         const int num_threads = 1;
+
+        struct timespec *t[] = {
+                &TIMESPEC_OFF(t0, 0),
+                &TIMESPEC_OFF(t0, 1),
+        };
         struct sample samples[] = {
-                SAMPLE(THREAD_0, FLOW_1, 0, 0),          /* 0 sec, 0 GB */
-                SAMPLE(THREAD_0, FLOW_1, 1, 1000000000), /* 1 sec, 1 GB */
+                SAMPLE(THREAD_0, FLOW_1, t[0], 0),          /* 0 sec, 0 GB */
+                SAMPLE(THREAD_0, FLOW_1, t[1], 1000000000), /* 1 sec, 1 GB */
         };
         link_samples(samples, ARRAY_SIZE(samples));
 
@@ -154,16 +180,23 @@ static void t_stream_stats_one_thread_one_flow_two_samples(void **state)
         assert_int_equal(2, stats.num_samples);
         assert_dbl_equal(1e9, stats.throughput);
         assert_dbl_equal(1.0, stats.correlation_coefficient);
-        assert_tv_equal(&TIMESPEC(1, 0), &stats.end_time);
+        assert_tv_equal(t[1], &stats.end_time);
 }
 
 static void t_stream_stats_one_thread_one_flow_three_samples(void **state)
 {
+        const struct timespec *t0 = *state;
         const int num_threads = 1;
+
+        struct timespec *t[] = {
+                &TIMESPEC_OFF(t0, 0),
+                &TIMESPEC_OFF(t0, 1),
+                &TIMESPEC_OFF(t0, 2),
+        };
         struct sample samples[] = {
-                SAMPLE(THREAD_0, FLOW_1, 0, 0),          /* 0 sec, 0 GB */
-                SAMPLE(THREAD_0, FLOW_1, 1, 1000000000), /* 1 sec, 1 GB */
-                SAMPLE(THREAD_0, FLOW_1, 2, 2000000000), /* 2 sec, 2 GB */
+                SAMPLE(THREAD_0, FLOW_1, t[0], 0),          /* 0 sec, 0 GB */
+                SAMPLE(THREAD_0, FLOW_1, t[1], 1000000000), /* 1 sec, 1 GB */
+                SAMPLE(THREAD_0, FLOW_1, t[2], 2000000000), /* 2 sec, 2 GB */
         };
         link_samples(samples, ARRAY_SIZE(samples));
 
@@ -175,17 +208,25 @@ static void t_stream_stats_one_thread_one_flow_three_samples(void **state)
         assert_int_equal(3, stats.num_samples);
         assert_dbl_equal(1e9, stats.throughput);
         assert_dbl_equal(1.0, stats.correlation_coefficient);
-        assert_tv_equal(&TIMESPEC(2, 0), &stats.end_time);
+        assert_tv_equal(t[2], &stats.end_time);
 }
 
 static void t_stream_stats_one_thread_two_flows_four_samples(void **state)
 {
+        const struct timespec *t0 = *state;
         const int num_threads = 1;
+
+        struct timespec *t[] = {
+                &TIMESPEC_OFF(t0, 0),
+                &TIMESPEC_OFF(t0, 1),
+                &TIMESPEC_OFF(t0, 2),
+                &TIMESPEC_OFF(t0, 3),
+        };
         struct sample samples[] = {
-                SAMPLE(THREAD_0, FLOW_1, 0, 0),          /* 0 sec, 0.0 GB, flow #1 */
-                SAMPLE(THREAD_0, FLOW_2, 1, 1500000000), /* 1 sec, 1.5 GB, flow #2 */
-                SAMPLE(THREAD_0, FLOW_1, 2, 3000000000), /* 2 sec, 3.0 GB, flow #1 */
-                SAMPLE(THREAD_0, FLOW_2, 3, 6000000000), /* 3 sec, 3.0 GB, flow #2 */
+                SAMPLE(THREAD_0, FLOW_1, t[0], 0),          /* 0 sec, 0.0 GB, flow #1 */
+                SAMPLE(THREAD_0, FLOW_2, t[1], 1500000000), /* 1 sec, 1.5 GB, flow #2 */
+                SAMPLE(THREAD_0, FLOW_1, t[2], 3000000000), /* 2 sec, 3.0 GB, flow #1 */
+                SAMPLE(THREAD_0, FLOW_2, t[3], 6000000000), /* 3 sec, 3.0 GB, flow #2 */
         };
         link_samples(samples, ARRAY_SIZE(samples));
 
@@ -196,7 +237,7 @@ static void t_stream_stats_one_thread_two_flows_four_samples(void **state)
         calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(4, stats.num_samples);
         assert_dbl_equal(3e9, stats.throughput);
-        assert_tv_equal(&TIMESPEC(3, 0), &stats.end_time);
+        assert_tv_equal(t[3], &stats.end_time);
         /*
          * FIXME: Correlation coefficient calculation for multiple flows is
          * broken. Two flows that have equal and constant pace have perfect
@@ -208,14 +249,20 @@ static void t_stream_stats_one_thread_two_flows_four_samples(void **state)
 
 static void t_stream_stats_two_threads_two_flows_four_samples(void **state)
 {
+        const struct timespec *t0 = *state;
         const int num_threads = 2;
+
+        struct timespec *t[] = {
+                &TIMESPEC_OFF(t0, 0),
+                &TIMESPEC_OFF(t0, 1),
+        };
         struct sample samples[2][2] = {
                 {
-                        SAMPLE(THREAD_0, FLOW_1, 0, 0),          /* 0 sec, 0 GB */
-                        SAMPLE(THREAD_0, FLOW_1, 1, 1000000000), /* 1 sec, 1 GB */
+                        SAMPLE(THREAD_0, FLOW_1, t[0], 0),          /* 0 sec, 0 GB */
+                        SAMPLE(THREAD_0, FLOW_1, t[1], 1000000000), /* 1 sec, 1 GB */
                 }, {
-                        SAMPLE(THREAD_1, FLOW_1, 0, 0),          /* 0 sec, 0 GB */
-                        SAMPLE(THREAD_1, FLOW_1, 1, 1000000000), /* 1 sec, 1 GB */
+                        SAMPLE(THREAD_1, FLOW_1, t[0], 0),          /* 0 sec, 0 GB */
+                        SAMPLE(THREAD_1, FLOW_1, t[1], 1000000000), /* 1 sec, 1 GB */
                 },
         };
         link_samples(samples[0], ARRAY_SIZE(samples[0]));
@@ -231,7 +278,7 @@ static void t_stream_stats_two_threads_two_flows_four_samples(void **state)
         calculate_stream_stats(threads, num_threads, &stats, NULL);
         assert_int_equal(4, stats.num_samples);
         assert_dbl_equal(2e9, stats.throughput);
-        assert_tv_equal(&TIMESPEC(1, 0), &stats.end_time);
+        assert_tv_equal(t[1], &stats.end_time);
         /*
          * FIXME: Correlation coefficient calculation for multiple flows is
          * broken. Two flows that have equal and constant pace have perfect
@@ -243,13 +290,19 @@ static void t_stream_stats_two_threads_two_flows_four_samples(void **state)
 
 int main(void)
 {
+        struct timespec t0;
+        int rc;
+
+        rc = clock_gettime(CLOCK_MONOTONIC, &t0);
+        assert_return_code(rc, errno);
+
         const struct CMUnitTest tests[] = {
                 cmocka_unit_test(t_stream_stats_zero_samples),
-                cmocka_unit_test(t_stream_stats_one_sample),
-                cmocka_unit_test(t_stream_stats_one_thread_one_flow_two_samples),
-                cmocka_unit_test(t_stream_stats_one_thread_one_flow_three_samples),
-                cmocka_unit_test(t_stream_stats_one_thread_two_flows_four_samples),
-                cmocka_unit_test(t_stream_stats_two_threads_two_flows_four_samples),
+                cmocka_unit_test_prestate(t_stream_stats_one_sample, &t0),
+                cmocka_unit_test_prestate(t_stream_stats_one_thread_one_flow_two_samples, &t0),
+                cmocka_unit_test_prestate(t_stream_stats_one_thread_one_flow_three_samples, &t0),
+                cmocka_unit_test_prestate(t_stream_stats_one_thread_two_flows_four_samples, &t0),
+                cmocka_unit_test_prestate(t_stream_stats_two_threads_two_flows_four_samples, &t0),
         };
 
         return cmocka_run_group_tests(tests, NULL, NULL);
