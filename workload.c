@@ -387,7 +387,7 @@ void calculate_stream_stats(const struct thread *threads, int num_threads,
         start_total = samples[start_index].bytes_read;
         current_total = start_total;
 
-        tid = samples[start_index].tid;
+        tid = samples[start_index].tid % num_threads;
         flow_id = samples[start_index].flow_id;
         per_flow[tid][flow_id] = start_total;
 
@@ -395,7 +395,7 @@ void calculate_stream_stats(const struct thread *threads, int num_threads,
         total_bytes = 0.0;
         sum_xy = sum_xx = sum_yy = 0.0;
         for (j = start_index + 1; j <= end_index; j++) {
-                tid = samples[j].tid;
+                tid = samples[j].tid % num_threads;
                 flow_id = samples[j].flow_id;
                 current_total -= per_flow[tid][flow_id];
                 per_flow[tid][flow_id] = samples[j].bytes_read;
