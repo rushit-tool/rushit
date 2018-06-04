@@ -148,7 +148,6 @@ static void t_stream_stats_one_sample(void **state)
 
         struct stats stats = INVALID_STATS;
         struct thread thread = FAKE_THREAD(samples);
-        UNUSED(state);
 
         calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(1, stats.num_samples);
@@ -174,7 +173,6 @@ static void t_stream_stats_one_thread_one_flow_two_samples(void **state)
 
         struct stats stats = INVALID_STATS;
         struct thread thread = FAKE_THREAD(samples);
-        UNUSED(state);
 
         calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(2, stats.num_samples);
@@ -202,7 +200,6 @@ static void t_stream_stats_one_thread_one_flow_three_samples(void **state)
 
         struct stats stats = INVALID_STATS;
         struct thread thread = FAKE_THREAD(samples);
-        UNUSED(state);
 
         calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(3, stats.num_samples);
@@ -232,7 +229,6 @@ static void t_stream_stats_one_thread_two_flows_four_samples(void **state)
 
         struct stats stats = INVALID_STATS;
         struct thread thread = FAKE_THREAD(samples);
-        UNUSED(state);
 
         calculate_stream_stats(&thread, num_threads, &stats, NULL);
         assert_int_equal(4, stats.num_samples);
@@ -273,7 +269,6 @@ static void t_stream_stats_two_threads_two_flows_four_samples(void **state)
                 FAKE_THREAD(samples[0]),
                 FAKE_THREAD(samples[1]),
         };
-        UNUSED(state);
 
         calculate_stream_stats(threads, num_threads, &stats, NULL);
         assert_int_equal(4, stats.num_samples);
