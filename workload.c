@@ -468,3 +468,24 @@ void report_stream_stats(struct thread *threads)
                 print_samples(0, samples, stats.num_samples, samples_file, cb);
 
 }
+
+int calculate_stream_stats_per_thread(const struct thread *threads,
+                                      int num_threads, struct stats **stats)
+{
+        struct stats *s;
+        int i;
+
+        assert(threads);
+        assert(num_threads > 0);
+        assert(stats);
+
+        s = calloc(num_threads, sizeof(*s));
+        if (!s)
+                return -ENOMEM;
+
+        for (i = 0; i < num_threads; i++)
+                calculate_stream_stats(&threads[i], 1, &s[i], NULL);
+
+        *stats = s;
+        return num_threads;
+}

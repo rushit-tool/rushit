@@ -91,5 +91,13 @@ void calculate_stream_stats(const struct thread *threads, int num_threads,
 /* Calculate and print out statistics for a stream workload */
 void report_stream_stats(struct thread *tinfo);
 
+/* Calculate statistics from samples separately for each thread.
+ *
+ * On success returns an array of `struct stat` with one entry for each thread
+ * and the number of entries as the return code. Caller needs to release the
+ * returned array with `free()`. On failure, returns a negative error code.
+ */
+int calculate_stream_stats_per_thread(const struct thread *threads,
+                                      int num_threads, struct stats **stats);
 
 #endif

@@ -288,6 +288,109 @@ static void t_stream_stats_two_threads_two_flows_four_samples(void **state)
         // assert_dbl_equal(1.0, stats.correlation_coefficient);
 }
 
+static void t_stats_per_thread_1_thread_1_flow_1_sample(void **state)
+{
+        const struct timespec *t0 = *state;
+        struct timespec *t[] = {
+                &TIMESPEC_OFF(t0, 0),
+        };
+
+        struct sample samples[] = {
+                SAMPLE(THREAD_0, FLOW_1, t[0], 0),
+        };
+        link_samples(samples, ARRAY_SIZE(samples));
+
+        struct thread threads[] = {
+                FAKE_THREAD(samples),
+        };
+        int num_threads = ARRAY_SIZE(threads);
+
+        CLEANUP(free) struct stats *stats = NULL;
+        int rc;
+
+        rc = calculate_stream_stats_per_thread(threads, num_threads, &stats);
+        assert_return_code(rc, -rc);
+        assert_non_null(stats);
+
+        assert_int_equal(1, stats[0].num_samples);
+        assert_dbl_equal(0, stats[0].throughput);
+        assert_tv_equal(t[0], &stats[0].end_time);
+}
+
+static void t_stats_per_thread_1_thread_1_flow_2_samples(void **state)
+{
+        const struct timespec *t0 = *state;
+        const struct timespec *t[] = {
+                &TIMESPEC_OFF(t0, 0),
+                &TIMESPEC_OFF(t0, 1),
+        };
+
+        struct sample samples[] = {
+                SAMPLE(THREAD_0, FLOW_1, t[0], 0),          /* 0 sec, 0 GB */
+                SAMPLE(THREAD_0, FLOW_1, t[1], 1000000000), /* 1 sec, 1 GB */
+        };
+        link_samples(samples, ARRAY_SIZE(samples));
+
+        const struct thread threads[] = {
+                FAKE_THREAD(samples),
+        };
+        const int num_threads = ARRAY_SIZE(threads);
+
+        CLEANUP(free) struct stats *stats = NULL;
+        int rc;
+
+        rc = calculate_stream_stats_per_thread(threads, num_threads, &stats);
+        assert_return_code(rc, -rc);
+        assert_non_null(stats);
+
+        assert_int_equal(2, stats[0].num_samples);
+        assert_dbl_equal(1e9, stats[0].throughput);
+        assert_tv_equal(t[1], &stats[0].end_time);
+}
+
+static void t_stats_per_thread_2_threads_2_flows_4_samples(void **state)
+{
+        const struct timespec *t0 = *state;
+        const struct timespec *t[] = {
+                &TIMESPEC_OFF(t0, 0),
+                &TIMESPEC_OFF(t0, 1),
+                &TIMESPEC_OFF(t0, 2),
+        };
+
+        struct sample samples[2][2] = {
+                {
+                        SAMPLE(THREAD_0, FLOW_1, t[0], 0)   ,       /* 0 sec, 0 GB */
+                        SAMPLE(THREAD_0, FLOW_1, t[1], 1000000000), /* 1 sec, 1 GB */
+                }, {
+                        SAMPLE(THREAD_1, FLOW_1, t[0], 0),          /* 0 sec, 0 GB */
+                        SAMPLE(THREAD_1, FLOW_1, t[2], 1000000000), /* 2 sec, 1 GB */
+                },
+        };
+        link_samples(samples[0], ARRAY_SIZE(samples[0]));
+        link_samples(samples[1], ARRAY_SIZE(samples[1]));
+
+        const struct thread threads[] = {
+                FAKE_THREAD(samples[0]),
+                FAKE_THREAD(samples[1]),
+        };
+        const int num_threads = ARRAY_SIZE(threads);
+
+        CLEANUP(free) struct stats *stats = NULL;
+        int rc;
+
+        rc = calculate_stream_stats_per_thread(threads, num_threads, &stats);
+        assert_return_code(rc, -rc);
+        assert_non_null(stats);
+
+        assert_int_equal(2, stats[0].num_samples);
+        assert_dbl_equal(1e9, stats[0].throughput);
+        assert_tv_equal(t[1], &stats[0].end_time);
+
+        assert_int_equal(2, stats[1].num_samples);
+        assert_dbl_equal(5e8, stats[1].throughput);
+        assert_tv_equal(t[2], &stats[1].end_time);
+}
+
 int main(void)
 {
         struct timespec t0;
@@ -303,6 +406,9 @@ int main(void)
                 cmocka_unit_test_prestate(t_stream_stats_one_thread_one_flow_three_samples, &t0),
                 cmocka_unit_test_prestate(t_stream_stats_one_thread_two_flows_four_samples, &t0),
                 cmocka_unit_test_prestate(t_stream_stats_two_threads_two_flows_four_samples, &t0),
+                cmocka_unit_test_prestate(t_stats_per_thread_1_thread_1_flow_1_sample, &t0),
+                cmocka_unit_test_prestate(t_stats_per_thread_1_thread_1_flow_2_samples, &t0),
+                cmocka_unit_test_prestate(t_stats_per_thread_2_threads_2_flows_4_samples, &t0),
         };
 
         return cmocka_run_group_tests(tests, NULL, NULL);
