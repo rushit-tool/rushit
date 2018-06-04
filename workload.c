@@ -455,13 +455,15 @@ void report_stream_stats(struct thread *threads)
         const char *samples_file;
         struct callbacks *cb;
         struct options *opts;
+        int num_threads;
 
         cb = threads[0].cb;
         opts = threads[0].opts;
         samples_file = opts->all_samples;
+        num_threads = opts->num_threads;
 
         samples_p = samples_file ? &samples : NULL;
-        calculate_stream_stats(threads, opts->num_threads, &stats, samples_p);
+        calculate_stream_stats(threads, num_threads, &stats, samples_p);
         print_stream_stats(cb, &stats);
 
         if (samples_file)
