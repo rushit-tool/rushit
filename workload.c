@@ -428,8 +428,26 @@ void calculate_stream_stats(const struct thread *threads, int num_threads,
                 free(per_flow[i]);
 }
 
+static void print_throughput_per_thread(const struct callbacks *cb,
+                                        const struct stats *stats,
+                                        int num_stats)
+{
+        int i;
+
+        for (i = 0; i < num_stats; i++) {
+                CLEANUP(free) char *key = NULL;
+                double tput;
+
+                tput = stats[i].throughput * 8 / 1e6;
+                asprintf(&key, "throughput_Mbps[%d]", i);
+                PRINT(cb, key, "%.2f", tput);
+        }
+}
+
 static void print_stream_stats(const struct callbacks *cb,
-                               const struct stats *stats)
+                               const struct stats *stats,
+                               const struct stats *per_thread,
+                               int num_threads)
 {
         if (stats->num_samples == 0) {
                 LOG_WARN(cb, "no samples collected");
@@ -441,6 +459,7 @@ static void print_stream_stats(const struct callbacks *cb,
 
         PRINT(cb, "num_samples", "%d", stats->num_samples);
         PRINT(cb, "throughput_Mbps", "%.2f", stats->throughput * 8 / 1e6);
+        print_throughput_per_thread(cb, per_thread, num_threads);
         PRINT(cb, "correlation_coefficient", "%.2f",
               stats->correlation_coefficient);
         PRINT(cb, "time_end", "%ld.%09ld",
@@ -450,12 +469,14 @@ static void print_stream_stats(const struct callbacks *cb,
 void report_stream_stats(struct thread *threads)
 {
         CLEANUP(free) struct sample *samples = NULL;
+        CLEANUP(free) struct stats *stats_per_thread = NULL;
         struct stats stats = { 0 };
         struct sample **samples_p;
         const char *samples_file;
         struct callbacks *cb;
         struct options *opts;
         int num_threads;
+        int num_stats;
 
         cb = threads[0].cb;
         opts = threads[0].opts;
@@ -464,7 +485,13 @@ void report_stream_stats(struct thread *threads)
 
         samples_p = samples_file ? &samples : NULL;
         calculate_stream_stats(threads, num_threads, &stats, samples_p);
-        print_stream_stats(cb, &stats);
+        num_stats = calculate_stream_stats_per_thread(threads, num_threads,
+                                                      &stats_per_thread);
+        if (num_stats < 0) {
+                LOG_FATAL(cb, "failed to calculate per thread stats (%d)",
+                          num_stats);
+        }
+        print_stream_stats(cb, &stats, stats_per_thread, num_stats);
 
         if (samples_file)
                 print_samples(0, samples, stats.num_samples, samples_file, cb);
