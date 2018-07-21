@@ -76,7 +76,8 @@ static inline void epoll_del_or_err(int epfd, int fd, struct callbacks *cb)
                 PLOG_ERROR(cb, "epoll_ctl");
 }
 
-static inline double seconds_between(struct timespec *a, struct timespec *b)
+static inline double seconds_between(const struct timespec *a,
+                                     const struct timespec *b)
 {
         return (b->tv_sec - a->tv_sec) + (b->tv_nsec - a->tv_nsec) * 1e-9;
 }

@@ -21,10 +21,16 @@
  * Logic shared by all workloads.
  */
 
+#include <sys/socket.h>
 #include <stdint.h>
 
 
+struct addrinfo;
 struct epoll_event;
+
+struct callbacks;
+struct options;
+struct thread;
 
 /* Set of all possible socket operations. open() is mandatory, rest is optional. */
 struct socket_ops {
@@ -38,6 +44,15 @@ struct socket_ops {
         /* For dummy/fake workloads only. Defaults to epoll_wait(2) if not set. */
         int (*epoll_wait)(int epfd, struct epoll_event *events, int maxevents, int timeout);
 };
+
+/* Statistics we calculate from a set of samples for stream workloads. */
+struct stats {
+        int num_samples;
+        double throughput;      /* bytes per second */
+        double correlation_coefficient;
+        struct timespec end_time;
+};
+
 
 /* Operations for TCP sockets. */
 extern const struct socket_ops tcp_socket_ops;
@@ -65,8 +80,24 @@ void run_client(struct thread *t, const struct socket_ops *ops,
 void run_server(struct thread *t, const struct socket_ops *ops,
                 process_events_t process_events);
 
+/* Calculates statistics from samples collected by threads. Expects that thread
+ * identifiers form consecutive sequence of integers (no holes), which doesn't
+ * need to start from 0. Optionally returns the aggregated list of samples to be
+ * free()'ed by the caller.
+ */
+void calculate_stream_stats(const struct thread *threads, int num_threads,
+                            struct stats *stats, struct sample **samples_);
+
 /* Calculate and print out statistics for a stream workload */
 void report_stream_stats(struct thread *tinfo);
 
+/* Calculate statistics from samples separately for each thread.
+ *
+ * On success returns an array of `struct stat` with one entry for each thread
+ * and the number of entries as the return code. Caller needs to release the
+ * returned array with `free()`. On failure, returns a negative error code.
+ */
+int calculate_stream_stats_per_thread(const struct thread *threads,
+                                      int num_threads, struct stats **stats);
 
 #endif

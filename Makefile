@@ -43,7 +43,7 @@ top-dir := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 staging-dir := $(top-dir)/staging
 
 # Packaging related - the version number is specified only inside the spec file
-VERSION		:= $(shell awk '/%define rushit_version /{print $$NF}' rushit.spec)
+VERSION		:= $(shell awk '/%define rushit_version /{print $$NF}' $(top-dir)/rushit.spec)
 DIST_ARCHIVES	:= rushit-$(VERSION).tar.gz
 RPMBUILD_TOP	:= ${top-dir}/rpm/
 
@@ -84,6 +84,13 @@ udp_stream-objs := udp_stream_main.o udp_stream.o
 
 binaries := tcp_rr tcp_stream dummy_test udp_stream
 
+# Use absolute paths to allow launching make out of top level dir
+base-objs := $(addprefix $(top-dir)/,$(base-objs))
+tcp_rr-objs := $(addprefix $(top-dir)/,$(tcp_rr-objs))
+tcp_stream-objs := $(addprefix $(top-dir)/,$(tcp_stream-objs))
+dummy_test-objs := $(addprefix $(top-dir)/,$(dummy_test-objs))
+udp_stream-objs := $(addprefix $(top-dir)/,$(udp_stream-objs))
+
 default: all
 
 # avoid dep geneation on clean targets
@@ -100,7 +107,7 @@ endif
 	$(CC) -c $(ALL_CPPFLAGS) $(ALL_CFLAGS) $< -o $@
 
 %.o: %.lua
-	$(luajit-exe) -b -t o -n $(basename $<) $< $@
+	$(luajit-exe) -b -t o -n $(notdir $<) $< $@
 
 %.d: %.c
 	@$(CC) -M $(ALL_CPPFLAGS) $< | \
@@ -191,13 +198,22 @@ func-test-dir  := $(test-dir)/func
 unit-test-dir  := $(test-dir)/unit
 unit-test-libs := $(shell pkg-config --libs cmocka)
 
-t_script-objs := $(unit-test-dir)/t_script.o
-tests-unit := $(unit-test-dir)/t_script
+# Unit test sources, dependencies, objects, binaries and artifacts
+unit-test-srcs := $(wildcard $(unit-test-dir)/t_*.c)
+unit-test-deps := $(unit-test-srcs:.c=.d)
+unit-test-objs := $(unit-test-srcs:.c=.o)
+unit-test-bins := $(unit-test-srcs:.c=)
+unit-test-arts := $(unit-test-deps) $(unit-test-objs) $(unit-test-bins)
+
+tests-unit := $(unit-test-bins)
 tests-func := $(wildcard $(func-test-dir)/[0-9][0-9][0-9][0-9])
 
--include $(t_script-objs:.o=.d)
+-include $(unit-test-deps)
 
-$(unit-test-dir)/t_script: $(t_script-objs)
+$(unit-test-dir)/%.o: $(unit-test-dir)/%.c
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $< -c
+
+$(unit-test-dir)/t_%: $(unit-test-dir)/t_%.o
 	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -o $@ $^ $(ALL_LDFLAGS) $(ALL_LDLIBS) $(unit-test-libs)
 
 $(tests-unit): $(base-objs) $(luajit-lib) $(ljsyscall-lib)
@@ -207,7 +223,7 @@ $(tests-func): $(binaries)
 build-tests: $(tests-unit)
 
 clean-tests:
-	$(RM) -f $(unit-test-dir)/*.[do] $(tests-unit)
+	$(RM) -f $(unit-test-arts)
 
 check-unit: $(tests-unit)
 	if [ -x "$$(type -P avocado)" ]; \
