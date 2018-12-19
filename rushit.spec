@@ -10,7 +10,7 @@ License:	ASL 2.0
 URL:		https://github.com/jsitnicki/rushit/
 Source0:	rushit-%{version}.tar.gz
 
-BuildRequires:	libcmocka-devel
+BuildRequires:	libcmocka-devel gcc make
 
 %description
 rushit is a tool for performance testing highly configurable
